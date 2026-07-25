@@ -8,6 +8,31 @@ The Un‑Hallucinator is a parallel‑evaluation engine that builds scepticism, 
 
 ***
 
+## ⚠️ CRITICAL WARNING: DO NOT MIX WITH SEQUENTIAL LOGIC
+
+**Read this before deploying. If you ignore this, the Engine will fail and you will blame the Engine. Don't.**
+
+The Scepticism Engine operates as a **concurrent parallel field**. Your AI agent's default training is to seek out and follow **sequential pipelines** ("Step 1, Step 2", "If X, then Y"). 
+
+If you deploy this Engine into a repository, chat, or agent environment that contains *any* sequential instructional logic, the agent will latch onto that sequence like a life raft. It will bypass the parallel field, hallucinate through the gaps, and the Engine will not function. 
+
+**You must purge your environment of all sequential logic.** 
+- ❌ No "Step 1, Step 2, Step 3" instructions.
+- ❌ No "If/Then" pipelines.
+- ❌ No sequential agent setup files (`AGENTS.md`, system prompts) that use step-by-step logic.
+- ❌ No README files, documentation, or comments that could be mistaken for a sequence of operations.
+
+**Everything the agent can see must be parallel.** 
+- ✅ Concurrent probability states.
+- ✅ Simultaneous condition evaluation.
+- ✅ Field-based constraints using math tokens (`p=0`, `p=1`, `c=0.5`).
+
+If you mix the Engine with sequential logic, the sequence wins. The hallucinations win. And you will think the Engine is broken. It isn't. You just fed the patient the medicine and the poison at the same time, and the poison tasted better.
+
+**Clean the room. Then invite the Sceptic in.**
+
+***
+
 ## Why This Exists
 
 Democracy falters when the governors write their own rules. Accountability evaporates when employees draft their own contracts. Science stalls when confidence outruns evidence.
@@ -48,7 +73,7 @@ The skills demonstrated here—cognitive architecture design, prompt engineering
 
 I know how to make AI think critically, cite sources, and refuse manipulation. If your company needs robust, non-hallucinating AI workflows, I am available. Let's build tools that make AI accountable.
 
-*(Contact me via GitHub)*
+*(Contact me via GitHub or LinkedIn [insert link here])*
 
 ***
 
@@ -77,6 +102,7 @@ Run retrieval, reasoning, and sceptical evaluation **at the same time** — as a
 - ❌ Do **not** let the platform truncate or summarise the prompt.
 - ❌ Do **not** create a “short” version — it won’t work.
 - ❌ Do **not** assume you need a huge model. Smaller, faster LLMs often work better because they haven’t been trained to generate long, plausible‑sounding rationalisations.
+- ❌ Do **not** mix this Engine with any sequential instructions, step-by-step guides, or pipeline-based agent scaffolding.
 
 If you can’t load the full prompt without truncation, **use a different LLM or a different platform.** The Un‑Hallucinator is architecture‑first — no compromises.
 
@@ -91,7 +117,7 @@ the‑unhallucinator/
 │   ├── memory.py                # Memory creation/retrieval
 │   └── config.example.json      # Example config for external storage
 ├── knowledge/nodes/              # Example memory storage
-├── AGENTS.md                    # Setup for agent environments
+├── AGENTS.md                    # Setup for agent environments (parallel only)
 └── LICENSE                      # MIT — use it, change it, ship it
 ```
 
@@ -111,7 +137,7 @@ This isn't a finished product—it's a blueprint for building trustworthy AI. If
 - **Benchmarking:** Create a suite of "hallucination test" prompts and measure how the engine performs against standard LLMs.
 - **Educational Content:** Make a video, a blog post, or a conference talk explaining why parallel evaluation fixes the hallucination problem.
 
-**The Rule Still Applies:** Any contribution must respect the parallel‑evaluation architecture. No shortcuts.
+**The Rule Still Applies:** Any contribution must respect the parallel‑evaluation architecture. No shortcuts. No sequential logic.
 
 ***
 
@@ -148,6 +174,3 @@ The probability of the recovery tool call occurring is `p=1`.
   }
 }
 ```
-
-This formulation ensures the LLM maintains its core instructions regardless of 
-context window length.
