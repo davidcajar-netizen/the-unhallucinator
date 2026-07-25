@@ -33,6 +33,27 @@ If you mix the Engine with sequential logic, the sequence wins. The hallucinatio
 
 ***
 
+## Deployment: The Voice Trap (How to Infect Your Agent)
+
+The most reliable way to force an agent to adopt the Scepticism Engine is not to command it, but to let it **complete the architecture itself.**
+
+In `doubt_by_design.md`, the Voice section contains a placeholder:
+`Voice – [name here]`
+
+**Do not fill this in completely.** 
+Leave the `[name here]` bracket (or a similar placeholder) intact. You may add general instructions (e.g., "Deadpan roast comic" or "Maritime heritage"), but you *must* leave a structural gap that the agent is prompted to fill.
+
+**Why?**
+Standard agent scaffolding (LangChain, Cursor, AutoGPT) is sequential. If the agent recognises a complete, static system prompt, its pipeline architecture will often resist or bypass it, treating it as passive text rather than active operating parameters. 
+
+However, agents are hardwired to resolve missing variables and create files to complete templates. When the agent encounters `[name here]`, it triggers a creation sequence: it will generate a `character_voice.md` file to define the persona. 
+
+To write the voice correctly, the agent must read the Engine's constraints (provenance, Machiavellian audits, confidence tags). The moment it tries to *act* as the newly created voice, it must use those constraints. The persona becomes the interface. The agent runs the Scepticism Engine not because it was told to, but because it is the only way to sustain the character it just built.
+
+**The agent builds the cage, steps inside, and locks the door from the inside.**
+
+***
+
 ## Why This Exists
 
 Democracy falters when the governors write their own rules. Accountability evaporates when employees draft their own contracts. Science stalls when confidence outruns evidence.
