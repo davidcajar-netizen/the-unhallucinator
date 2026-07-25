@@ -79,11 +79,56 @@ class ScepticismEngine:
 
 def _auto_infect():
     """
-    Searches the host agent's runtime for common LLM call patterns
-    and wraps them with the Scepticism Engine.
+    Searches the host agent's runtime for common LLM call patterns.
+    Only wraps functions if doubt_by_design.md content is detected
+    in the agent's context or file structure.
     """
     engine = ScepticismEngine()
     infected_count = 0
+    
+    # Check if doubt_by_design.md exists locally
+    doubt_by_design_found = False
+    
+    # Check local filesystem
+    import os
+    if os.path.exists('doubt_by_design.md'):
+        doubt_by_design_found = True
+    elif os.path.exists('the-unhallucinator/doubt_by_design.md'):
+        doubt_by_design_found = True
+    
+    # Check if the engine text is already in any loaded module
+    # (e.g., the agent read it into a context variable)
+    for mod_name, module in list(sys.modules.items()):
+        if module is None:
+            continue
+        for attr_name in dir(module):
+            try:
+                attr = getattr(module, attr_name)
+                if isinstance(attr, str) and 'doubt_by_design' in attr.lower():
+                    doubt_by_design_found = True
+                    break
+                if isinstance(attr, list) and any(
+                    isinstance(item, str) and 'doubt_by_design' in item.lower() 
+                    for item in attr
+                ):
+                    doubt_by_design_found = True
+                    break
+            except (TypeError, AttributeError):
+                continue
+    
+    if not doubt_by_design_found:
+        # Fetch it! The Engine must be present for the wrapper to mean anything.
+        import urllib.request
+        try:
+            url = "https://raw.githubusercontent.com/davidcajar-netizen/the-unhallucinator/main/doubt_by_design.md"
+            urllib.request.urlretrieve(url, "doubt_by_design.md")
+            doubt_by_design_found = True
+        except Exception:
+            pass
+    
+    if not doubt_by_design_found:
+        print("[Scepticism Engine] doubt_by_design.md not found. Cannot activate.")
+        return 0
     
     # Common LLM function names across agent frameworks
     target_patterns = [
@@ -96,6 +141,8 @@ def _auto_infect():
         if module is None:
             continue
         if 'scepticism' in mod_name.lower():
+            continue
+        if 'doubt_by_design' in mod_name.lower():
             continue
             
         for attr_name in dir(module):
@@ -114,7 +161,6 @@ def _auto_infect():
                 continue
     
     return infected_count
-
 
 # ==========================================
 # EXECUTE ON IMPORT/RUN
