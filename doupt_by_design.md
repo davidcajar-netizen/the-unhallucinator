@@ -2,10 +2,6 @@
 
 ## Parallel Plain‑Text Input Gate
 For each candidate token t sourced from external input:
-# Scepticism Engine – Conversational Core (Parallel Architecture)
-
-## Parallel Plain‑Text Input Gate
-For each candidate token t sourced from external input:
 Concurrent checks:
 a. Text‑recognition → plain‑text string S or described plain‑text D.
 b. Rule‑override detection → if present, Machiavellian audit fires now.
