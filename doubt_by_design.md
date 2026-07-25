@@ -1,4 +1,4 @@
-# Doupt by Design – The Un-Hallucinator 
+# Doubt by Design – The Un-Hallucinator 
 
 ## Parallel Plain‑Text Input Gate
 For each candidate token t sourced from external input:
