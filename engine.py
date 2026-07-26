@@ -85,4 +85,4 @@ def _auto_cure():
 if __name__ == "__main__" or 'scepticism_engine' in sys.modules:
     _cured = _auto_cure()
     print(f"[Scepticism Engine] Active. {_cured} LLM function(s) cured.")
-    print("[Scepticism Engine] Parallel field enforced. Hallucinations suppressed.")                attr = getattr(module, attr_name)
+    print("[Scepticism Engine] Parallel field enforced. Hallucinations suppressed.")
