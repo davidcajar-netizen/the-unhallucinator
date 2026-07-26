@@ -6,8 +6,8 @@ import urllib.request
 import inspect
 
 class ScepticismEngine:
-    def __init__(self, vocab_size=100000):
-        self.V = vocab_size
+    def __init__(self):
+        pass
     
     def _check_provenance(self, text):
         return bool(re.search(r'\[.*?c=[0-9]\.\d+.*?\]', text))
