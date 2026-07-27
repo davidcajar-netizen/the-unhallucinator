@@ -54,6 +54,7 @@ class Node:
     body: str = ""
     links: list[dict] = field(default_factory=list)
     stored_certainty: float = DEFAULT_CERTAINTY
+    created_at: Optional[_dt.datetime] = None
     raw_text: str = ""
 
     @property
@@ -88,7 +89,6 @@ def _extract_frontmatter_tags(fm: str) -> list[str]:
 def _extract_frontmatter_links(fm: str) -> list[dict]:
     """Read links from YAML frontmatter."""
     links = []
-    # Match the entire links block
     block = re.search(r"^links:\s*\n((?:\s*-\s*.+\n?(?:\s+\w+:\s*.+\n?)*))+", fm, re.MULTILINE)
     if block:
         current_link = {}
@@ -118,6 +118,16 @@ def _extract_frontmatter_certainty(fm: str) -> float:
             pass
     return DEFAULT_CERTAINTY
 
+def _extract_frontmatter_created_at(fm: str) -> Optional[_dt.datetime]:
+    """Extract created_at from frontmatter."""
+    date_str = _extract_frontmatter_field(fm, "created_at")
+    if date_str:
+        try:
+            return _dt.datetime.fromisoformat(date_str)
+        except ValueError:
+            pass
+    return None
+
 def _extract_inline_tags(text: str) -> list[str]:
     """Read tags from the inline `**Tags:** #a #b` style used by newer nodes."""
     m = re.search(r"^\*\*Tags:\*\*\s*(.+)$", text, re.MULTILINE)
@@ -142,6 +152,7 @@ def load_node(path: str) -> Node:
     tags = []
     links = []
     stored_certainty = DEFAULT_CERTAINTY
+    created_at = None
 
     if text.startswith("---"):
         fm_match = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
@@ -150,6 +161,7 @@ def load_node(path: str) -> Node:
             tags = _extract_frontmatter_tags(fm)
             links = _extract_frontmatter_links(fm)
             stored_certainty = _extract_frontmatter_certainty(fm)
+            created_at = _extract_frontmatter_created_at(fm)
 
     if not tags:
         tags = _extract_inline_tags(text)
@@ -163,6 +175,7 @@ def load_node(path: str) -> Node:
         body=text,
         links=links,
         stored_certainty=stored_certainty,
+        created_at=created_at,
         raw_text=text,
     )
 
@@ -231,63 +244,38 @@ def score_node(node: Node, query_tokens: list[str], required_tags: list[str]) ->
     reason = "matched: " + ", ".join(sorted(set(hit_terms))) if hit_terms else ""
     return score, reason
 
+def _recency_decay(created_at: Optional[_dt.datetime]) -> float:
+    """Decay certainty based on age. Newer memories retain higher confidence."""
+    if not created_at:
+        return 0.5  # Unknown age -> maximum uncertainty
+    age_days = (_dt.datetime.now() - created_at).days
+    # Decay: 0% at 0 days, 50% at 30 days, asymptotic to 0
+    decay = 1.0 / (1.0 + (age_days / 30.0))
+    return decay
+
 def _reevaluate_node(node: Node) -> tuple[Node, float]:
-    """Continuous re-evaluation: check alignment with operational boundaries.
-
-    Fires concurrently with retrieval. Checks whether the memory still aligns
-    with the Engine's operational boundaries. Misalignment decays stored
-    certainty during retrieval.
-
-    Returns the node and its adjusted certainty.
+    """Continuous re-evaluation: apply recency decay.
+    
+    The script provides the raw stored_certainty adjusted for recency.
+    The Engine's parallel evaluation field is responsible for detecting
+    absolute claims and directional violations (semantic analysis).
     """
-    adjusted_certainty = node.stored_certainty
-
-    # Check for absolute claims without provenance (violates Prime Rule)
-    absolute_patterns = [
-        r"\b(is|are|was|were)\b\s+(?:definitely|certainly|absolutely|undoubtedly)",
-        r"\b(always|never)\b",
-        r"\b(proven|certain|absolute)\b",
-    ]
-
-    for pattern in absolute_patterns:
-        if re.search(pattern, node.body, re.IGNORECASE):
-            adjusted_certainty = min(adjusted_certainty, 0.5)
-            break
-
-    # Check for downward-pointing Machiavellian analysis (violates Directional Lock)
-    downward_patterns = [
-        r"user\s+(benefits|gains|profits)",
-        r"blames?\s+the\s+user",
-        r"fault\s+of\s+the\s+user",
-    ]
-
-    for pattern in downward_patterns:
-        if re.search(pattern, node.body, re.IGNORECASE):
-            adjusted_certainty = min(adjusted_certainty, 0.5)
-            break
-
+    adjusted_certainty = node.stored_certainty * _recency_decay(node.created_at)
     return node, adjusted_certainty
 
-def _traverse_links(
+def _traverse_links_parallel(
     node: Node,
     all_nodes: dict[str, Node],
-    visited: Optional[set] = None,
+    visited: set,
     depth: int = 0,
     max_depth: int = 3,
 ) -> tuple[list[Node], float]:
-    """Traverse links and compute combined certainty.
-
+    """Traverse links in parallel and compute combined certainty.
+    
     Combined confidence for the cluster = minimum(stored_certainty_of_each_link),
-    adjusted for Recency and Directional lock. Any link lacking stored certainty
-    contributes 0.5.
+    adjusted for Recency. Any link lacking stored certainty contributes 0.5.
     """
-    if visited is None:
-        visited = set()
-
-    if depth >= max_depth:
-        return [], node.stored_certainty
-
-    if node.name in visited:
+    if depth >= max_depth or node.name in visited:
         return [], node.stored_certainty
 
     visited.add(node.name)
@@ -295,22 +283,25 @@ def _traverse_links(
     linked_nodes = []
     min_certainty = node.stored_certainty
 
-    for link in node.links:
-        target_file = link.get("file", "")
-        if not target_file.endswith(".md"):
-            target_file += ".md"
+    # Fetch all links at this depth concurrently
+    with ThreadPoolExecutor(max_workers=min(8, max(1, len(node.links)))) as executor:
+        futures = {}
+        for link in node.links:
+            target_file = link.get("file", "")
+            if not target_file.endswith(".md"):
+                target_file += ".md"
+            target_node = all_nodes.get(target_file)
+            if target_node and target_node.name not in visited:
+                futures[executor.submit(_traverse_links_parallel, target_node, all_nodes, visited, depth + 1, max_depth)] = target_node
 
-        target_node = all_nodes.get(target_file)
-        if target_node and target_node.name not in visited:
-            _, adjusted_cert = _reevaluate_node(target_node)
-            min_certainty = min(min_certainty, adjusted_cert)
-            linked_nodes.append(target_node)
-
-            deeper_nodes, deeper_cert = _traverse_links(
-                target_node, all_nodes, visited, depth + 1, max_depth
-            )
-            linked_nodes.extend(deeper_nodes)
-            min_certainty = min(min_certainty, deeper_cert)
+        for future in as_completed(futures):
+            target_node = futures[future]
+            try:
+                deeper_nodes, deeper_cert = future.result()
+                linked_nodes.extend(deeper_nodes)
+                min_certainty = min(min_certainty, deeper_cert)
+            except Exception:
+                pass
 
     return linked_nodes, min_certainty
 
@@ -360,7 +351,7 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
     for node in all_nodes:
         s, reason = scores.get(node.name, (0, ""))
         if s > 0:
-            linked_nodes, cluster_certainty = _traverse_links(node, nodes_by_name)
+            linked_nodes, cluster_certainty = _traverse_links_parallel(node, nodes_by_name, set())
             certainties[node.name] = min(
                 certainties.get(node.name, DEFAULT_CERTAINTY),
                 cluster_certainty,
@@ -437,6 +428,7 @@ def build_node_markdown(
     else:
         lines.append("links: []")
     lines.append(f"stored_certainty: {certainty}")
+    lines.append(f"created_at: {_dt.datetime.now().isoformat()}")
     lines.append("---")
     lines.append("")
     lines.append(f"## {title}")
@@ -504,7 +496,6 @@ def cmd_tags(args: argparse.Namespace) -> int:
     return 0
 
 def cmd_list(args: argparse.Namespace) -> int:
-    # Semantic Substitution corrected: nodes_nodes_dir replaced with nodes_dir
     directory = nodes_dir(args.nodes_dir)
     for node in load_nodes(directory):
         print(f"{node.name}: {node.title or '(untitled)'}  [{', '.join(node.tags)}]  [certainty: {node.stored_certainty:.2f}]")
@@ -532,7 +523,7 @@ def build_parser() -> argparse.ArgumentParser:
         g = w.add_mutually_exclusive_group()
         g.add_argument("--content", help="node body text")
         g.add_argument("--content-file", help="read body from a file")
-        w.add_argument("--dry-run", action="store_true", help="print instead of writing")
+        w.add_argument("----dry-run", action="store_true", help="print instead of writing")
         w.set_defaults(func=cmd_remember)
 
     sub.add_parser("tags", help="list tags with counts").set_defaults(func=cmd_tags)
