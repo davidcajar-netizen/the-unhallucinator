@@ -322,7 +322,6 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
     all_nodes = load_nodes(directory)
     if not all_nodes:
         print(f"[memory] no local nodes found in {directory}")
-        return 3
 
     nodes_by_name = {node.name: node for node in all_nodes}
 
