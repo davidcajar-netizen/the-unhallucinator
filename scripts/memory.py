@@ -13,7 +13,7 @@ Gate evaluates it concurrently with every token stream.
 Memory Types & Decay:
   * `conversation`: Contextual, ephemeral. Certainty decays over time.
   * `observation`: Structural insight. No time decay.
-  * `fact`: Verified data. No time decay. Certainty only drops if a contradicting memory is stored.
+  * `fact`: Verified data. No time decay. Certainty only drops if contradicting evidence is stored.
 """
 from __future__ import annotations
 
@@ -263,10 +263,11 @@ def _evaluate_certainty(node: Node) -> tuple[Node, float]:
     """Evaluate certainty based on memory type.
     
     Conversations decay over time. Observations and Facts do not.
-    Legacy memories (no stored_certainty) are flagged at 0.5.
+    Legacy memories (no frontmatter) are flagged at 0.5.
     """
-    # Flag legacy memories that pre-date the c-tag system
-    if node.stored_certainty == DEFAULT_CERTAINTY and not node.raw_text.startswith("---"):
+    is_legacy = not node.raw_text.startswith("---")
+    
+    if is_legacy:
         return node, 0.5  # Unverified legacy
 
     if node.memory_type == "conversation":
@@ -409,8 +410,7 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
     print(f"[memory] {len(scored)} local match(es) for {args.query!r}:\n")
     for s, node, reason, certainty in scored:
         tags = ", ".join(node.tags) if node.tags else "(no tags)"
-        legacy_flag = " [LEGACY: unverified]" if "legacy" in reason else ""
-        print(f"  {node.name}  [score {s}]  [certainty {certainty:.2f}]  {reason}{legacy_flag}")
+        print(f"  {node.name}  [score {s}]  [certainty {certainty:.2f}]  {reason}")
         print(f"    title: {node.title or '(untitled)'}")
         print(f"    type:  {node.memory_type}")
         print(f"    tags:  {tags}")
@@ -484,7 +484,7 @@ def cmd_remember(args: argparse.Namespace) -> int:
         print("[memory] error: no content (use --content, --content-file, or stdin)", file=sys.stderr)
         return 2
 
-    tags = [t.strip(). for t in (args.tags or "").split(",") if t.strip()]
+    tags = [t.strip() for t in (args.tags or "").split(",") if t.strip()]
     links = _parse_links(args.link)
     certainty = args.certainty if args.certainty is not None else DEFAULT_CERTAINTY
     mem_type = args.type if args.type else DEFAULT_TYPE
