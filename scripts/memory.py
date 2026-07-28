@@ -10,7 +10,10 @@ Gate evaluates it concurrently with every token stream.
   * `remember` (alias `ledger`) writes a new atomic `memN.md` node with YAML
     frontmatter when a durable insight is learned, auto-assigning the next number.
 
-Only the Python standard library is used. No package manager. No dependencies.
+Memory Types & Decay:
+  * `conversation`: Contextual, ephemeral. Certainty decays over time.
+  * `observation`: Structural insight. No time decay.
+  * `fact`: Verified data. No time decay. Certainty only drops if a contradicting memory is stored.
 """
 from __future__ import annotations
 
@@ -37,6 +40,7 @@ BODY_WEIGHT = 1
 
 # Default certainty for memories lacking an explicit stored_certainty.
 DEFAULT_CERTAINTY = 0.5
+DEFAULT_TYPE = "observation"
 
 def nodes_dir(explicit: str | None = None) -> str:
     return explicit or os.environ.get("MEMORY_NODES_DIR") or DEFAULT_NODES_DIR
@@ -54,6 +58,7 @@ class Node:
     body: str = ""
     links: list[dict] = field(default_factory=list)
     stored_certainty: float = DEFAULT_CERTAINTY
+    memory_type: str = DEFAULT_TYPE
     created_at: Optional[_dt.datetime] = None
     raw_text: str = ""
 
@@ -118,6 +123,13 @@ def _extract_frontmatter_certainty(fm: str) -> float:
             pass
     return DEFAULT_CERTAINTY
 
+def _extract_frontmatter_type(fm: str) -> str:
+    """Extract memory_type from frontmatter, defaulting to observation."""
+    type_str = _extract_frontmatter_field(fm, "memory_type")
+    if type_str:
+        return type_str.strip("'\"").lower()
+    return DEFAULT_TYPE
+
 def _extract_frontmatter_created_at(fm: str) -> Optional[_dt.datetime]:
     """Extract created_at from frontmatter."""
     date_str = _extract_frontmatter_field(fm, "created_at")
@@ -152,6 +164,7 @@ def load_node(path: str) -> Node:
     tags = []
     links = []
     stored_certainty = DEFAULT_CERTAINTY
+    memory_type = DEFAULT_TYPE
     created_at = None
 
     if text.startswith("---"):
@@ -161,6 +174,7 @@ def load_node(path: str) -> Node:
             tags = _extract_frontmatter_tags(fm)
             links = _extract_frontmatter_links(fm)
             stored_certainty = _extract_frontmatter_certainty(fm)
+            memory_type = _extract_frontmatter_type(fm)
             created_at = _extract_frontmatter_created_at(fm)
 
     if not tags:
@@ -175,6 +189,7 @@ def load_node(path: str) -> Node:
         body=text,
         links=links,
         stored_certainty=stored_certainty,
+        memory_type=memory_type,
         created_at=created_at,
         raw_text=text,
     )
@@ -244,24 +259,27 @@ def score_node(node: Node, query_tokens: list[str], required_tags: list[str]) ->
     reason = "matched: " + ", ".join(sorted(set(hit_terms))) if hit_terms else ""
     return score, reason
 
-def _recency_decay(created_at: Optional[_dt.datetime]) -> float:
-    """Decay certainty based on age. Newer memories retain higher confidence."""
-    if not created_at:
-        return 0.5  # Unknown age -> maximum uncertainty
-    age_days = (_dt.datetime.now() - created_at).days
-    # Decay: 0% at 0 days, 50% at 30 days, asymptotic to 0
-    decay = 1.0 / (1.0 + (age_days / 30.0))
-    return decay
-
-def _reevaluate_node(node: Node) -> tuple[Node, float]:
-    """Continuous re-evaluation: apply recency decay.
+def _evaluate_certainty(node: Node) -> tuple[Node, float]:
+    """Evaluate certainty based on memory type.
     
-    The script provides the raw stored_certainty adjusted for recency.
-    The Engine's parallel evaluation field is responsible for detecting
-    absolute claims and directional violations (semantic analysis).
+    Conversations decay over time. Observations and Facts do not.
+    Legacy memories (no stored_certainty) are flagged at 0.5.
     """
-    adjusted_certainty = node.stored_certainty * _recency_decay(node.created_at)
-    return node, adjusted_certainty
+    # Flag legacy memories that pre-date the c-tag system
+    if node.stored_certainty == DEFAULT_CERTAINTY and not node.raw_text.startswith("---"):
+        return node, 0.5  # Unverified legacy
+
+    if node.memory_type == "conversation":
+        if not node.created_at:
+            return node, 0.5
+        age_days = (_dt.datetime.now() - node.created_at).days
+        # Decay: 0% at 0 days, 50% at 30 days, asymptotic to 0
+        decay = 1.0 / (1.0 + (age_days / 30.0))
+        adjusted = node.stored_certainty * decay
+        return node, adjusted
+    
+    # Observations and Facts: no time decay
+    return node, node.stored_certainty
 
 def _traverse_links_parallel(
     node: Node,
@@ -272,8 +290,8 @@ def _traverse_links_parallel(
 ) -> tuple[list[Node], float]:
     """Traverse links in parallel and compute combined certainty.
     
-    Combined confidence for the cluster = minimum(stored_certainty_of_each_link),
-    adjusted for Recency. Any link lacking stored certainty contributes 0.5.
+    Combined confidence for the cluster = minimum(stored_certainty_of_each_link).
+    Any link lacking stored certainty contributes 0.5.
     """
     if depth >= max_depth or node.name in visited:
         return [], node.stored_certainty
@@ -283,7 +301,6 @@ def _traverse_links_parallel(
     linked_nodes = []
     min_certainty = node.stored_certainty
 
-    # Fetch all links at this depth concurrently
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(node.links)))) as executor:
         futures = {}
         for link in node.links:
@@ -323,8 +340,8 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
             for node in all_nodes
         }
 
-        reeval_futures = {
-            executor.submit(_reevaluate_node, node): node
+        eval_futures = {
+            executor.submit(_evaluate_certainty, node): node
             for node in all_nodes
         }
 
@@ -339,15 +356,16 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
                 scores[node.name] = (0, "")
 
         certainties = {}
-        for future in as_completed(reeval_futures):
-            node = reeval_futures[future]
+        for future in as_completed(eval_futures):
+            node = eval_futures[future]
             try:
                 _, adjusted_cert = future.result()
                 certainties[node.name] = adjusted_cert
             except Exception as e:
-                print(f"[memory] error re-evaluating {node.name}: {e}", file=sys.stderr)
+                print(f"[memory] error evaluating {node.name}: {e}", file=sys.stderr)
                 certainties[node.name] = DEFAULT_CERTAINTY
 
+    # Traverse links for matched nodes and propagate minimum certainty
     for node in all_nodes:
         s, reason = scores.get(node.name, (0, ""))
         if s > 0:
@@ -379,6 +397,7 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
                 "tags": node.tags,
                 "score": s,
                 "reason": reason,
+                "memory_type": node.memory_type,
                 "stored_certainty": node.stored_certainty,
                 "adjusted_certainty": certainty,
                 "body": node.body if args.show_body else None,
@@ -386,11 +405,14 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
         print(json.dumps({"results": results, "count": len(results)}, indent=2))
         return 0
 
-    print(f"[memory] {len(scored)} local match(es) for {args.query!r} (search web only if insufficient):\n")
+    # Verdict-based output for the Engine
+    print(f"[memory] {len(scored)} local match(es) for {args.query!r}:\n")
     for s, node, reason, certainty in scored:
         tags = ", ".join(node.tags) if node.tags else "(no tags)"
-        print(f"  {node.name}  [score {s}]  [certainty {certainty:.2f}]  {reason}")
+        legacy_flag = " [LEGACY: unverified]" if "legacy" in reason else ""
+        print(f"  {node.name}  [score {s}]  [certainty {certainty:.2f}]  {reason}{legacy_flag}")
         print(f"    title: {node.title or '(untitled)'}")
+        print(f"    type:  {node.memory_type}")
         print(f"    tags:  {tags}")
         print(f"    certainty: {certainty:.2f} (stored: {node.stored_certainty:.2f})")
         if args.show_body:
@@ -417,6 +439,7 @@ def build_node_markdown(
     links: list[tuple[str, str]],
     content: str,
     certainty: float = DEFAULT_CERTAINTY,
+    memory_type: str = DEFAULT_TYPE,
 ) -> str:
     tag_line = "[" + ", ".join(tags) + "]" if tags else "[]"
     lines = ["---", f"tags: {tag_line}"]
@@ -428,6 +451,7 @@ def build_node_markdown(
     else:
         lines.append("links: []")
     lines.append(f"stored_certainty: {certainty}")
+    lines.append(f"memory_type: {memory_type}")
     lines.append(f"created_at: {_dt.datetime.now().isoformat()}")
     lines.append("---")
     lines.append("")
@@ -460,9 +484,10 @@ def cmd_remember(args: argparse.Namespace) -> int:
         print("[memory] error: no content (use --content, --content-file, or stdin)", file=sys.stderr)
         return 2
 
-    tags = [t.strip() for t in (args.tags or "").split(",") if t.strip()]
+    tags = [t.strip(). for t in (args.tags or "").split(",") if t.strip()]
     links = _parse_links(args.link)
     certainty = args.certainty if args.certainty is not None else DEFAULT_CERTAINTY
+    mem_type = args.type if args.type else DEFAULT_TYPE
 
     # Warn (do not block) if a node with the same title already exists
     for node in load_nodes(directory):
@@ -471,7 +496,7 @@ def cmd_remember(args: argparse.Namespace) -> int:
 
     number = next_number(directory)
     filename = f"mem{number}.md"
-    markdown = build_node_markdown(args.title, tags, links, content, certainty)
+    markdown = build_node_markdown(args.title, tags, links, content, certainty, mem_type)
 
     if args.dry_run:
         print(f"[memory] dry-run: would write {filename}\n")
@@ -482,7 +507,7 @@ def cmd_remember(args: argparse.Namespace) -> int:
     path = os.path.join(directory, filename)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(markdown)
-    print(f"[memory] wrote {os.path.relpath(path, REPO_ROOT)} (tags: {', '.join(tags) or 'none'}, certainty: {certainty:.2f})")
+    print(f"[memory] wrote {os.path.relpath(path, REPO_ROOT)} (type: {mem_type}, tags: {', '.join(tags) or 'none'}, certainty: {certainty:.2f})")
     return 0
 
 def cmd_tags(args: argparse.Namespace) -> int:
@@ -498,7 +523,7 @@ def cmd_tags(args: argparse.Namespace) -> int:
 def cmd_list(args: argparse.Namespace) -> int:
     directory = nodes_dir(args.nodes_dir)
     for node in load_nodes(directory):
-        print(f"{node.name}: {node.title or '(untitled)'}  [{', '.join(node.tags)}]  [certainty: {node.stored_certainty:.2f}]")
+        print(f"{node.name}: {node.title or '(untitled)'}  [{', '.join(node.tags)}]  [type: {node.memory_type}]  [certainty: {node.stored_certainty:.2f}]")
     return 0
 
 def build_parser() -> argparse.ArgumentParser:
@@ -520,10 +545,11 @@ def build_parser() -> argparse.ArgumentParser:
         w.add_argument("--tags", help="comma-separated tags")
         w.add_argument("--link", action="append", help="link as memX or memX:relation (repeatable)")
         w.add_argument("--certainty", type=float, default=DEFAULT_CERTAINTY, help=f"stored certainty (default: {DEFAULT_CERTAINTY})")
+        w.add_argument("--type", default=DEFAULT_TYPE, choices=["conversation", "observation", "fact"], help=f"memory type (default: {DEFAULT_TYPE})")
         g = w.add_mutually_exclusive_group()
         g.add_argument("--content", help="node body text")
         g.add_argument("--content-file", help="read body from a file")
-        w.add_argument("----dry-run", action="store_true", help="print instead of writing")
+        w.add_argument("--dry-run", action="store_true", help="print instead of writing")
         w.set_defaults(func=cmd_remember)
 
     sub.add_parser("tags", help="list tags with counts").set_defaults(func=cmd_tags)
