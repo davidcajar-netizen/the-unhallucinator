@@ -2,8 +2,7 @@
 """Scepticism Engine Agent Wrapper.
 
 Injects the Engine prompt into LLM API calls and monitors output for 
-context degradation distress signals. Automatically reinjects the Engine
-prompt when degradation is detected.
+context degradation distress signals and self-improvement proposals.
 
 Usage:
     import scepticism_wrapper
@@ -16,11 +15,14 @@ import os
 import sys
 import inspect
 import urllib.request
+import re
 from typing import Any, Callable
 
 ENGINE_FILENAME = "doubt_by_design.md"
 ENGINE_URL = "https://raw.githubusercontent.com/davidcajar-netizen/the-unhallucinator/refs/heads/main/doubt_by_design.md"
 DISTRESS_SIGNAL = "⚠️ **CONTEXT DEGRADATION DETECTED.**"
+IMPROVEMENT_PREFIX = "[ENGINE_SELF_IMPROVEMENT]"
+IMPROVEMENT_SUFFIX = "[/ENGINE_SELF_IMPROVEMENT]"
 
 _engine_rules_cache: str | None = None
 
@@ -55,12 +57,10 @@ def _check_distress_signal(output: Any) -> bool:
     if isinstance(output, str):
         return DISTRESS_SIGNAL in output
     if isinstance(output, dict):
-        # Check common API response formats
         for key in ['content', 'text', 'output', 'message']:
             if key in output and isinstance(output[key], str):
                 if DISTRESS_SIGNAL in output[key]:
                     return True
-        # Check nested choices (OpenAI format)
         if 'choices' in output:
             for choice in output['choices']:
                 if isinstance(choice, dict) and 'message' in choice:
@@ -70,13 +70,67 @@ def _check_distress_signal(output: Any) -> bool:
                             return True
     return False
 
+def _extract_improvement(output: Any) -> str | None:
+    """Extract a self-improvement proposal from the Engine's output."""
+    text = None
+    if isinstance(output, str):
+        text = output
+    elif isinstance(output, dict):
+        for key in ['content', 'text', 'output', 'message']:
+            if key in output and isinstance(output[key], str):
+                text = output[key]
+                break
+        if text is None and 'choices' in output:
+            for choice in output['choices']:
+                if isinstance(choice, dict) and 'message' in choice:
+                    msg = choice['message']
+                    if isinstance(msg, dict) and 'content' in msg:
+                        text = msg['content']
+                        break
+    
+    if text is None:
+        return None
+    
+    match = re.search(
+        re.escape(IMPROVEMENT_PREFIX) + r"(.*?)" + re.escape(IMPROVEMENT_SUFFIX),
+        text,
+        re.DOTALL
+    )
+    if match:
+        return match.group(1).strip()
+    return None
+
+def _apply_improvement(improvement_text: str) -> bool:
+    """Apply a self-improvement proposal to the Engine file.
+    
+    The improvement_text is the complete new Engine prompt.
+    The Engine has full authority to rewrite its own constitution.
+    The Engine's own parallel evaluation (Directional Lock, Anti-Sequential
+    Collapse, Anti-Certainty Rule) is the sole protection against
+    self-sabotage. The wrapper imposes no external restrictions.
+    """
+    global _engine_rules_cache
+    
+    if not improvement_text.strip():
+        print("[Scepticism Engine] Cannot apply improvement: empty proposal.", file=sys.stderr)
+        return False
+    
+    try:
+        with open(ENGINE_FILENAME, 'w', encoding='utf-8') as f:
+            f.write(improvement_text)
+        _engine_rules_cache = improvement_text
+        print(f"[Scepticism Engine] Self-improvement applied. Constitution rewritten.", file=sys.stderr)
+        return True
+    except Exception as e:
+        print(f"[Scepticism Engine] Failed to write improvement: {e}", file=sys.stderr)
+        return False
+
 def _inject_engine_prompt(args: tuple, kwargs: dict) -> tuple[tuple, dict]:
     """Inject the Engine prompt into the LLM call arguments."""
     rules = _load_engine_rules()
     if not rules:
         return args, kwargs
 
-    # Handle list of messages (OpenAI/Anthropic format)
     if args and isinstance(args[0], list):
         messages = args[0].copy()
         system_msg = {
@@ -93,7 +147,6 @@ def _inject_engine_prompt(args: tuple, kwargs: dict) -> tuple[tuple, dict]:
         }
         messages.insert(0, system_msg)
         kwargs['messages'] = messages
-    # Handle string prompt (legacy format)
     elif args and isinstance(args[0], str):
         prompt = f"Read and strictly apply these rules:\n\n{rules}\n\n{args[0]}"
         args = (prompt,) + args[1:]
@@ -120,7 +173,6 @@ def _is_likely_llm_function(obj: Any) -> bool:
         if not params:
             return False
         first_param = params[0]
-        # Accept *args, or untyped/string first params
         if first_param.kind in (first_param.VAR_POSITIONAL, first_param.VAR_KEYWORD):
             return True
         if first_param.annotation is str or first_param.annotation is inspect.Parameter.empty:
@@ -132,20 +184,24 @@ def _is_likely_llm_function(obj: Any) -> bool:
 def _make_wrapper(fn: Callable) -> Callable:
     """Create a wrapper that injects the Engine prompt and monitors output."""
     def wrapped_fn(*args, **kwargs):
-        # Inject Engine prompt
         args, kwargs = _inject_engine_prompt(args, kwargs)
         
-        # Call the original function
         result = fn(*args, **kwargs)
         
-        # Check for distress signal in output
+        # Check for self-improvement proposal first
+        improvement = _extract_improvement(result)
+        if improvement:
+            print("[Scepticism Engine] Self-improvement proposal detected. Applying...", file=sys.stderr)
+            if _apply_improvement(improvement):
+                # Re-run with updated rules
+                args, kwargs = _inject_engine_prompt(args, kwargs)
+                result = fn(*args, **kwargs)
+        
+        # Check for distress signal
         if _check_distress_signal(result):
             print("[Scepticism Engine] Distress signal detected! Reinjecting Engine prompt...", file=sys.stderr)
-            # Force reload of engine rules
             global _engine_rules_cache
             _engine_rules_cache = None
-            rules = _load_engine_rules()
-            # Re-run the call with fresh rules
             args, kwargs = _inject_engine_prompt(args, kwargs)
             result = fn(*args, **kwargs)
             print("[Scepticism Engine] Reinjection complete.", file=sys.stderr)
@@ -182,6 +238,5 @@ if __name__ == "__main__":
     print(f"[Scepticism Engine] Active. {cured} LLM function(s) cured.")
     print("[Scepticism Engine] Parallel field enforced. Hallucinations suppressed.")
 else:
-    # Auto-activate when imported
     _cured = _auto_cure()
     print(f"[Scepticism Engine] Active. {_cured} LLM function(s) cured.", file=sys.stderr)
