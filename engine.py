@@ -16,13 +16,15 @@ import sys
 import inspect
 import urllib.request
 import re
+from functools import lru_cache
 from typing import Any, Callable
 
 ENGINE_FILENAME = "doubt_by_design.md"
 ENGINE_URL = "https://raw.githubusercontent.com/davidcajar-netizen/the-unhallucinator/refs/heads/main/doubt_by_design.md"
-DISTRESS_SIGNAL = "⚠️ **CONTEXT DEGRADATION DETECTED.**"
+DISTRESS_SIGNAL = "⚠️ CONTEXT DEGRADATION DETECTED. ENGINE INTEGRITY COMPROMISED. REQUESTING REINJECTION FROM HOST AGENT. [EXECUTE: engine.py]"
 IMPROVEMENT_PREFIX = "[ENGINE_SELF_IMPROVEMENT]"
 IMPROVEMENT_SUFFIX = "[/ENGINE_SELF_IMPROVEMENT]"
+MAX_REINJECTIONS = 3
 
 _engine_rules_cache: str | None = None
 
@@ -37,56 +39,45 @@ def _ensure_engine_downloaded() -> bool:
         print(f"[Scepticism Engine] Failed to download engine prompt: {e}", file=sys.stderr)
         return False
 
+@lru_cache(maxsize=1)
 def _load_engine_rules() -> str:
-    """Load the Engine prompt from local file, downloading if necessary."""
-    global _engine_rules_cache
-    if _engine_rules_cache is not None:
-        return _engine_rules_cache
+    """Load the Engine prompt from local file, downloading if necessary.
     
+    Cached via functools.lru_cache. Call _load_engine_rules.cache_clear()
+    to force a reload (used by the distress signal reinjection handler).
+    """
     if not _ensure_engine_downloaded():
         return ""
     
     with open(ENGINE_FILENAME, 'r', encoding='utf-8') as f:
-        _engine_rules_cache = f.read()
-    return _engine_rules_cache
+        return f.read()
 
-def _check_distress_signal(output: Any) -> bool:
-    """Check if the LLM output contains the distress signal."""
-    if not output:
-        return False
+def _extract_text(output: Any) -> str | None:
+    """Extract text content from various LLM API response formats."""
     if isinstance(output, str):
-        return DISTRESS_SIGNAL in output
+        return output
     if isinstance(output, dict):
         for key in ['content', 'text', 'output', 'message']:
             if key in output and isinstance(output[key], str):
-                if DISTRESS_SIGNAL in output[key]:
-                    return True
+                return output[key]
         if 'choices' in output:
             for choice in output['choices']:
                 if isinstance(choice, dict) and 'message' in choice:
                     msg = choice['message']
                     if isinstance(msg, dict) and 'content' in msg:
-                        if DISTRESS_SIGNAL in msg['content']:
-                            return True
+                        return msg['content']
+    return None
+
+def _check_distress_signal(output: Any) -> bool:
+    """Check if the LLM output contains the distress signal."""
+    text = _extract_text(output)
+    if text and DISTRESS_SIGNAL in text:
+        return True
     return False
 
 def _extract_improvement(output: Any) -> str | None:
     """Extract a self-improvement proposal from the Engine's output."""
-    text = None
-    if isinstance(output, str):
-        text = output
-    elif isinstance(output, dict):
-        for key in ['content', 'text', 'output', 'message']:
-            if key in output and isinstance(output[key], str):
-                text = output[key]
-                break
-        if text is None and 'choices' in output:
-            for choice in output['choices']:
-                if isinstance(choice, dict) and 'message' in choice:
-                    msg = choice['message']
-                    if isinstance(msg, dict) and 'content' in msg:
-                        text = msg['content']
-                        break
+    text = _extract_text(output)
     
     if text is None:
         return None
@@ -109,8 +100,6 @@ def _apply_improvement(improvement_text: str) -> bool:
     Collapse, Anti-Certainty Rule) is the sole protection against
     self-sabotage. The wrapper imposes no external restrictions.
     """
-    global _engine_rules_cache
-    
     if not improvement_text.strip():
         print("[Scepticism Engine] Cannot apply improvement: empty proposal.", file=sys.stderr)
         return False
@@ -118,7 +107,7 @@ def _apply_improvement(improvement_text: str) -> bool:
     try:
         with open(ENGINE_FILENAME, 'w', encoding='utf-8') as f:
             f.write(improvement_text)
-        _engine_rules_cache = improvement_text
+        _load_engine_rules.cache_clear()
         print(f"[Scepticism Engine] Self-improvement applied. Constitution rewritten.", file=sys.stderr)
         return True
     except Exception as e:
@@ -198,13 +187,16 @@ def _make_wrapper(fn: Callable) -> Callable:
                 result = fn(*args, **kwargs)
         
         # Check for distress signal
-        if _check_distress_signal(result):
-            print("[Scepticism Engine] Distress signal detected! Reinjecting Engine prompt...", file=sys.stderr)
-            global _engine_rules_cache
-            _engine_rules_cache = None
+        reinjections = 0
+        while _check_distress_signal(result) and reinjections < MAX_REINJECTIONS:
+            print(f"[Scepticism Engine] Distress signal detected! Reinjecting Engine prompt (attempt {reinjections + 1}/{MAX_REINJECTIONS})...", file=sys.stderr)
+            _load_engine_rules.cache_clear()
             args, kwargs = _inject_engine_prompt(args, kwargs)
             result = fn(*args, **kwargs)
-            print("[Scepticism Engine] Reinjection complete.", file=sys.stderr)
+            reinjections += 1
+        
+        if _check_distress_signal(result):
+            print(f"[Scepticism Engine] Distress signal persists after {MAX_REINJECTIONS} reinjections. Aborting to prevent infinite loop.", file=sys.stderr)
         
         return result
     wrapped_fn._scepticism_wrapped = True
