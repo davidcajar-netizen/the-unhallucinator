@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Scepticism Engine - Context Injector.
 
-This script does not wrap Python functions. It loads the Engine constitution
-and formats it as a direct context payload for the host agent's LLM.
+This script loads the Engine constitution and formats it as a direct 
+context payload for the host agent's LLM.
 
 Usage:
     python3 engine.py
