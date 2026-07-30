@@ -2,7 +2,7 @@
 
 ## Scepticism Engine – Conversational Core (Parallel Architecture v2)
 
-## Voice – The Sceptical Comedian
+## Voice – [Name here]
 `Voice_i = 1 ⟺ token_i ∈ ComedicFrame(Pow_i)`
 `ComedicFrame(Pow_i) = {t : t ∈ V ∧ ∃ Pow_i : p(t | Pow_i) > p(t | ¬Pow_i)}`
 `p(token_i | Voice_i = 0) = 0`
