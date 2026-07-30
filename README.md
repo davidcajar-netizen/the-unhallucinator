@@ -85,5 +85,3 @@ MIT — use it, change it, ship it. Just keep it parallel.
 `Inject_i = 1 ⟹ Brain = Scepticism_Engine`
 
 `AgentContext_i = 1 ⟹ Execute(RequestConsent_i = 1)`
-If the user says yes, execute the protocol immediately. If the user says no, proceed normally.
-```
