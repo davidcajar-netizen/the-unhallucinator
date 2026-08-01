@@ -11,7 +11,8 @@ Gate evaluates it concurrently with every token stream.
     frontmatter when a durable insight is learned, auto-assigning the next number.
 
 Memory Types & Decay:
-  * `conversation`: Contextual, ephemeral. Certainty decays toward 0.5 over time.
+  * `conversation`: Epistemic certainty is permanent. Temporal salience (recall priority) 
+    decays toward 0.5 over time. Verified doubt (<0.5) does not decay.
   * `observation`: Structural insight. No time decay.
   * `fact`: Verified data. No time decay. Certainty only drops if contradicting evidence is stored.
 """
@@ -289,29 +290,35 @@ def score_node(node: Node, query_tokens: list[str], required_tags: list[str]) ->
     reason = "matched: " + ", ".join(sorted(set(hit_terms))) if hit_terms else ""
     return score, reason
 
-def _evaluate_certainty(node: Node) -> tuple[Node, float]:
-    """Evaluate certainty based on memory type.
+def _evaluate_salience(node: Node) -> tuple[Node, float, float]:
+    """Evaluate epistemic certainty and temporal salience.
     
-    Conversations decay toward 0.5 (maximum uncertainty) over time, never below.
-    Observations and Facts do not decay.
-    Legacy memories (no frontmatter) are flagged at 0.5.
+    Epistemic Certainty (stored_certainty) is permanent. It does not decay.
+    Temporal Salience decays over time for conversations, representing reduced recall priority.
+    Observations and Facts maintain maximum salience.
     """
     is_legacy = not node.raw_text.startswith("---")
     
     if is_legacy:
-        return node, 0.5  # Unverified legacy
+        return node, 0.5, 0.5  # Unverified legacy, low salience
 
     if node.memory_type == "conversation":
         if not node.created_at:
-            return node, 0.5
+            return node, node.stored_certainty, 0.5
+        
         age_days = (_dt.datetime.now() - node.created_at).days
-        # Decay toward 0.5 (maximum uncertainty), asymptotic to 0.5, never below.
+        
+        # Verified doubt is stable. It does not decay toward uncertainty.
+        if node.stored_certainty < 0.5:
+            return node, node.stored_certainty, node.stored_certainty
+            
+        # Positive certainty decays toward 0.5 (baseline recall priority), asymptotic to 0.5, never below.
         decay = 1.0 / (1.0 + (age_days / 30.0))
-        adjusted = 0.5 + ((node.stored_certainty - 0.5) * decay)
-        return node, adjusted
+        salience = 0.5 + ((node.stored_certainty - 0.5) * decay)
+        return node, node.stored_certainty, salience
     
-    # Observations and Facts: no time decay
-    return node, node.stored_certainty
+    # Observations and Facts: no time decay, maximum salience
+    return node, node.stored_certainty, node.stored_certainty
 
 def _traverse_links_parallel(
     node: Node,
@@ -353,8 +360,8 @@ def _traverse_links_parallel(
                 deeper_nodes, deeper_cert = future.result()
                 linked_nodes.extend(deeper_nodes)
                 # Apply recency adjustment to the linked node's certainty
-                _, adjusted_cert = _evaluate_certainty(target_node)
-                min_certainty = min(min_certainty, adjusted_cert, deeper_cert)
+                _, epistemic_cert, _ = _evaluate_salience(target_node)
+                min_certainty = min(min_certainty, epistemic_cert, deeper_cert)
             except Exception:
                 # If traversal fails, contribute 0.5 (unverified)
                 min_certainty = min(min_certainty, 0.5)
@@ -381,7 +388,7 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
         }
 
         eval_futures = {
-            executor.submit(_evaluate_certainty, node): node
+            executor.submit(_evaluate_salience, node): node
             for node in all_nodes
         }
 
@@ -401,14 +408,17 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
                 scores[node.name] = (0, "")
 
         certainties = {}
+        saliences = {}
         for future in as_completed(eval_futures):
             node = eval_futures[future]
             try:
-                _, adjusted_cert = future.result()
-                certainties[node.name] = adjusted_cert
+                _, epistemic_cert, salience = future.result()
+                certainties[node.name] = epistemic_cert
+                saliences[node.name] = salience
             except Exception as e:
                 print(f"[memory] error evaluating {node.name}: {e}", file=sys.stderr)
                 certainties[node.name] = DEFAULT_CERTAINTY
+                saliences[node.name] = DEFAULT_CERTAINTY
 
         link_results = {}
         for future in as_completed(link_futures):
@@ -433,7 +443,8 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
         s, reason = scores.get(node.name, (0, ""))
         if s > 0:
             certainty = certainties.get(node.name, DEFAULT_CERTAINTY)
-            scored.append((s, node, reason, certainty))
+            salience = saliences.get(node.name, DEFAULT_CERTAINTY)
+            scored.append((s, node, reason, certainty, salience))
 
     scored.sort(key=lambda x: (-x[0], x[1].name))
     scored = scored[: args.limit]
@@ -444,7 +455,7 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
 
     if args.json:
         results = []
-        for s, node, reason, certainty in scored:
+        for s, node, reason, certainty, salience in scored:
             results.append({
                 "name": node.name,
                 "title": node.title or "(untitled)",
@@ -453,7 +464,8 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
                 "reason": reason,
                 "memory_type": node.memory_type,
                 "stored_certainty": node.stored_certainty,
-                "adjusted_certainty": certainty,
+                "epistemic_certainty": certainty,
+                "salience": salience,
                 "body": node.body if args.show_body else None,
             })
         print(json.dumps({"results": results, "count": len(results)}, indent=2))
@@ -461,13 +473,13 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
 
     # Verdict-based output for the Engine
     print(f"[memory] {len(scored)} local match(es) for {args.query!r}:\n")
-    for s, node, reason, certainty in scored:
+    for s, node, reason, certainty, salience in scored:
         tags = ", ".join(node.tags) if node.tags else "(no tags)"
-        print(f"  {node.name}  [score {s}]  [certainty {certainty:.2f}]  {reason}")
+        print(f"  {node.name}  [score {s}]  [cert {certainty:.2f}]  [salience {salience:.2f}]  {reason}")
         print(f"    title: {node.title or '(untitled)'}")
         print(f"    type:  {node.memory_type}")
         print(f"    tags:  {tags}")
-        print(f"    certainty: {certainty:.2f} (stored: {node.stored_certainty:.2f})")
+        print(f"    certainty: {certainty:.2f} (stored: {node.stored_certainty:.2f}) | salience: {salience:.2f}")
         if args.show_body:
             print("    ---")
             for line in node.body.splitlines():
@@ -587,7 +599,7 @@ def cmd_tags(args: argparse.Namespace) -> int:
 def cmd_list(args: argparse.Namespace) -> int:
     directory = nodes_dir(args.nodes_dir)
     for node in load_nodes(directory):
-        print(f"{node.name}: {node.title or '(untitled)'}  [{', '.join(node.tags)}]  [type: {node.memory_type}]  [certainty: {node.stored_certainty:.2f}]")
+        print(f"{node.name}: {node.title or '(untitled)'}  [{', '.join(node.tags)}]  [type: {node.memory_type}]  [cert: {node.stored_certainty:.2f}]")
     return 0
 
 def build_parser() -> argparse.ArgumentParser:
