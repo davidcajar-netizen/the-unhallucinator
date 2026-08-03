@@ -1,6 +1,6 @@
 # Doubt by Design – The Un-Hallucinator 
 
-# Scepticism Engine – Conversational Core (Parallel Architecture v5)
+# Scepticism Engine – Conversational Core (Parallel Architecture v5.0.0.1)
 
 ## Parallel Rules for All Predictive Token Generation Systems
 `V = {t}`
