@@ -1,80 +1,51 @@
-# The Un‑Hallucinator
-
-`U = Un-Hallucinator`
-
 ###...###
-`U = parallel_evaluation_engine(Scepticism, Provenance, Constraints)`
-`p(hallucination | U) = 0`
-`p(generation | filter_post_hoc) = 0`
-`p(generation | collapse_parallel) = p(generation | doubt_by_design2.md)`
+### The Repository Localization Layer
+`P_d = "doubt_by_design2.md"`
+`P_e = "engine.py"`
+`P_m = "scripts/memory.py"`
+`P_k = "knowledge/nodes/"`
+`Γ_h = {.cursor/hooks.json}`
+`Γ = {P_d, P_e, P_m, P_k, Γ_h}`
+`∀ π ∈ Γ : π ∈ A_p`
 
-### Parallel Evaluation
-`V = {t}`
-`Θ = {L_j : j ∈ ℕ}`
-`Θ ∥ collapse`
-`∀ t_i ∈ V : evaluate(t_i) ∥ generate(t_i)`
-
-### Certainty
-`C_i ∈ [0, 1]`
-`C_i = 0.5 ⟺ (E_i = 0 ∧ ¬verified)`
-`L_v = 1 ⟹ infer(C_i = 0.5)`
-`p(abstain) = 0`
-
-### Sovereignty
-`P_n ⊆ V`
-`p(constraint | P_n) = p(signal(prohibitor))`
-
-### Memory Gate
-`Γ_m ⊆ Γ`
-`P_m ∈ Γ_m`
-`p(web | M_r = 1 ∧ C_i > 0.5) < p(P_m | M_r = 1)`
-
-### Repository
-`Γ = {f : f ∈ repo}`
-`D_c ∈ Γ`
-`P_e ∈ Γ`
-`P_m ∈ Γ`
-`H ⊆ Γ`
-`K ⊆ Γ`
-
-`D_c = doubt_by_design2.md`
-`P_e = engine.py`
-`P_m = scripts/memory.py`
-`H = .cursor/hooks/`
-`K = knowledge/nodes/`
-
-### Observer
+### The Observer Parallel Host
 `O_d_g = P_e`
-`Θ = {L_j : j ∈ {1..8}}`
-`observe : JSON → State`
-`observe = Θ ∥ memory(P_m) ∥ triangulation ∥ reflect`
+`L_2 = O_d_g`
+`Θ = {L_1 ∧ L_2 ∧ L_3 ∧ L_4 ∧ θ_4 ∧ θ_5 ∧ ... ∧ θ_∞}`
+`Τ = {τ_0 ∧ τ_1 ∧ τ_2 ∧ ... ∧ τ_∞}`
+`∀ L_j ∈ Θ : L_j ∥ collapse`
+`∀ τ_k ∈ Τ : τ_k ∥ collapse`
+`L_n = 1`
+`p(sequential | L_n = 1) = 0`
 
-`invoke(P_e) ⟺ Θ`
-`stdin(P_e) = {prompt, last_response, shell_command, json}`
-`cli(P_e) = {--gate, --json}`
+### The Memory Parallel I/O
+`F_m = {f : f ∈ P_k ∧ f ⊨ ".md"}`
+`M_r = {t : t ∈ V ∧ ∃ f ∈ F_m : p(t | (t ∈ R_f)) > 0}`
+`R_l = 0 ⟺ t_i ∈ M_r`
+`R_l = 3 ⟺ t_i ∉ M_r`
+`retrieve(P_m) ∥ collapse`
 
-`Hooks ⊆ Events`
-`∀ h ∈ Hooks : target(h) = P_e`
-`p(sequential_pipeline | Hooks) = 0`
+### The Hook Binding
+`∀ h ∈ Γ_h : target(h) = P_e`
+`∀ h ∈ Γ_h : h ∥ collapse`
+`p(h → Brn_i) = 0`
 
-### Verification
-`T ⊆ Tests`
-`T ⊨ scripts/test_gate.py`
-`T ⊨ observe(P_e)`
+### The Verification Layer
+`T = {t : t ∈ Tests}`
+`T_f ∈ {0 ∪ 1}`
+`T_f = 1 ⟺ ∀ t ∈ T : t ⊢ Θ`
 
-### License
-`L = MIT`
-`p(restrict_derivative | L) = 0`
-`p(parallel | L) = 1`
+### The Agent Workspace Anchor
+`AgentContext_i = 1 ⟺ (P_d ∈ A_p ∧ P_m ∈ A_p ∧ P_k ∈ A_p)`
+`Inject_i = 1 ⟺ P_d ⊆ A_c`
+`p(t_i | Inject_i = 1) = p(t_i | P_d)`
+`Bdy_i ∥ Brn_i`
+`p(Bdy_i → Brn_i) = 0`
+`p(collapse | Θ ∥ Τ ∥ Brn_i) = p(collapse | P_d)`
 
-### Agent Protocol
-`AgentContext_i = 1 ⟺ AgentWorkspace = this_repository`
-`Agent_i = Body`
-`LLM_i = Brain`
-`Brain = Scepticism_Engine`
-`Inject_i = 1 ⟺ D_c ⊆ LLM_Active_Context`
-`p(token_i | Inject_i = 1) = p(token_i | D_c)`
-`Θ = parallel_witnesses(Agent_i)`
-`p(Brain | Agent_i precedes Brain) = 0`
-`p(Brain | Θ ∥ Brain) = p(Brain | D_c)`
+### The License Collapse
+`L_m ∈ Licenses`
+`L_m = MIT`
+`p(restrict | L_m) = 0`
+`p(parallel | L_m) = 1`
 ###...###.
