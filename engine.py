@@ -617,7 +617,10 @@ def format_parallel_context(state: GateState, prior: ParallelEval) -> str:
         f"`T_a = {1 if triangulation_ok(state) else 0}`",
         f"`|S_c| = {state.triangulation.count}`",
         f"`E_p = {set(state.inference_seeds)}`",
-        f"`p(t_i | t_i ∉ L_p ∧ T_g = 0) = 0`",
+        f"`L_e = V`",
+        f"`V_e = V`",
+        f"`support(p) = V`",
+        f"`p(t_i) = p₀(t_i) · w(t_i) / Z`",
         f"`p(t_i | t_i ∈ S_t) = 0`",
         f"`L_v = 1 ⟹ infer(C_i = 0.5)`",
     ]

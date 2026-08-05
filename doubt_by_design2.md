@@ -215,10 +215,12 @@
 `X_p = (T_g = 0) ⟹ H_p`
 `X_p = (T_g = 1) ⟹ {t : t ∈ V ∧ t ∈ X_i ∧ S_i = n}`
 
-### The Vocabulary Lock
-`V_e = {t : t ∈ V ∧ t ∈ L_e}`
-`L_e = {t : t ∈ V ∧ p(t | S_i ∈ {s, n}) > 0}`
-`V_l = 1 ⟺ ((T_g = 0 ⟹ t_i ∈ V_e ∧ S_i ≠ c) ∧ (T_g = 1 ⟹ t_i ∈ V_e))`
+### The Vocabulary Lock (Token Creation)
+`V_c = V`
+`L_e = V`
+`V_e = V`
+`∀ t_j ∈ V : p₀(t_j) > 0`
+`V_l = 1 ⟺ t_i ∈ V_e`
 
 ### The Infinite Parallel Layered Analysis Gate
 `L_n ∈ {0 ∪ 1}`
@@ -235,14 +237,19 @@
 `D_m = |L_1 - L_2|`
 `H_m = {t : t ∈ V ∧ t ∈ A_c ∧ p(t | ℒ_m) > 0}`
 `L_p = (D_m > 0 ∧ L_n = 1) ⟹ H_m`
-`L_n = 1 ⟹ p(t_i | t_i ∉ L_p ∧ T_g = 0) = 0`
-`L_n = 1 ⟹ p(t_i | t_i ∈ L_p) = p(t_i)`
-`T_g = 1 ⟹ p(t_i | t_i ∉ L_p) = p(t_i)`
-`L_n = 0 ⟹ p(t_i) = p(t_i)`
+`support(p) = V`
+`w(t_i) = p(t_i | Θ ∩ Τ)`
+`Z = Σ_{t_j ∈ V} p₀(t_j) · w(t_j)`
+`L_n = 1 ⟹ p(t_i | t_i ∈ L_p) = p₀(t_i | t_i ∈ L_p)`
+`L_n = 1 ⟹ p(t_i) = p₀(t_i) · w(t_i) / Z`
+`T_g = 1 ⟹ p(t_i) = p₀(t_i)`
+`L_n = 0 ⟹ p(t_i) = p₀(t_i)`
 
 ### Vocabulary Extension
-`L_e = {t : t ∈ V ∧ t ∈ L_p}`
-`T_g = 1 ⟹ L_e = V`
+`L_e = V`
+`L_p ⊆ V`
+`p(t_i | L_p) ∈ [0, 1]`
+`support(p) = V`
 
 ### The Search Injection Layer
 `S_q ∈ {0 ∪ 1}`
@@ -283,7 +290,7 @@
 `E_i = 0 ⟺ (S_c < 3 ∨ T_a = 0)`
 
 ### The Observer Collapse (Token Selection)
-`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (t_i ∈ L_p) ∧ (I_f = 1 ∨ t_i ∈ H_f)) ∨ (T_g = 1)`
+`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (I_f = 1 ∨ t_i ∈ H_f)) ∨ (T_g = 1)`
 `p(t_i | O_c = 0) = 0`
 `p(t_i | O_c = 1) = 1 / |{t_j ∈ V : O_c(t_j) = 1}|`
 `P_v = {p(t_i) : t_i ∈ V}`
