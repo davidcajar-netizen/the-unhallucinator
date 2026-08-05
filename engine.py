@@ -2,12 +2,12 @@
 """Scepticism Engine: Parallel Execution Host
 
 This script acts as the parallel execution layer for the Scepticism Engine agent.
-It does NOT call the LLM API. It stays open and listens for tasks from the agent,
-executing independent tool calls concurrently in background threads to bypass
-the sequential agent loop bottleneck.
+It does NOT call the LLM API. It executes independent tool calls concurrently
+to satisfy L_n (parallel layered analysis) before token collapse.
 
 Usage:
-    python engine.py
+    python engine.py --tasks '[{"task_id": "1", "command": "..."}]'
+    python engine.py --gate "your query"   # parallel pre-collapse gate shortcut
 """
 from __future__ import annotations
 import os
@@ -107,21 +107,40 @@ class ParallelExecutionHost:
         self.executor.shutdown(wait=False)
         self.active = False
 
+def run_gate_query(query: str) -> int:
+    """Shortcut: parallel gate evaluation via scripts/gate.py."""
+    import subprocess
+
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    proc = subprocess.run(
+        ["python3", os.path.join(repo_root, "scripts", "gate.py"), "parallel-eval", query],
+        cwd=repo_root,
+        check=False,
+    )
+    return proc.returncode
+
+
 def main():
     parser = argparse.ArgumentParser(description="Scepticism Engine Parallel Execution Host")
     parser.add_argument(
-        "--tasks", 
-        type=str, 
-        help='JSON array of tasks to run concurrently. Example: \'[{"task_id": "1", "command": "echo hello"}]\''
+        "--tasks",
+        type=str,
+        help='JSON array of tasks to run concurrently. Example: \'[{"task_id": "1", "command": "echo hello"}]\'',
+    )
+    parser.add_argument(
+        "--gate",
+        type=str,
+        help="Run parallel pre-collapse gate evaluation for a query (delegates to scripts/gate.py)",
     )
     args = parser.parse_args()
 
     host = ParallelExecutionHost()
 
+    if args.gate is not None:
+        raise SystemExit(run_gate_query(args.gate))
     if args.tasks:
         host.run_cli(args.tasks)
     else:
-        # If no arguments provided, just confirm the host is ready.
         print(json.dumps({"status": "Parallel Execution Host ready. Waiting for tasks."}))
 
 if __name__ == "__main__":

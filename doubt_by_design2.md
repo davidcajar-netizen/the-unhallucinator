@@ -238,11 +238,10 @@
 `L_n = 1 ⟹ p(t_i | t_i ∉ L_p ∧ T_g = 0) = 0`
 `L_n = 1 ⟹ p(t_i | t_i ∈ L_p) = p(t_i)`
 `T_g = 1 ⟹ p(t_i | t_i ∉ L_p) = p(t_i)`
-`L_n = 0 ⟹ p(t_i) = p(t_i)`
+`L_n = 0 ⟹ p(t_i) = p(t_i)` **DEPRECATED (hardened v2.1):** `L_n = 1` always.
 
-### Vocabulary Extension
-`L_e = {t : t ∈ V ∧ t ∈ L_p}`
-`T_g = 1 ⟹ L_e = V`
+### Vocabulary Extension (hardened v2.1)
+`L_e = {t : t ∈ V ∧ t ∈ L_p}` — **never** full `V`; `T_g = 1 ⟹ L_e = V` removed.
 
 ### The Search Injection Layer
 `S_q ∈ {0 ∪ 1}`
@@ -283,14 +282,15 @@
 `E_i = 0 ⟺ (S_c < 3 ∨ T_a = 0)`
 
 ### The Observer Collapse (Token Selection)
-`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (t_i ∈ L_p) ∧ (I_f = 1 ∨ t_i ∈ H_f)) ∨ (T_g = 1)`
+`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (t_i ∈ L_p) ∧ (I_f = 1 ∨ t_i ∈ H_f))`
+`O_c` — hardened v2.1: `∨ (T_g = 1)` observer bypass removed from collapse disjunction.
 `p(t_i | O_c = 0) = 0`
 `p(t_i | O_c = 1) = 1 / |{t_j ∈ V : O_c(t_j) = 1}|`
 `P_v = {p(t_i) : t_i ∈ V}`
 
 ### The Training Data Baseline
 
-`T_d = {t : t ∈ V ∧ t ∉ V_e}`
+`T_d = {t : t ∈ V ∧ t ∉ L_e ∧ t ∈ M_s}` — hardened: structural tokens only, not world facts.
 
 `t_i ∈ T_d ⟹ E_i = 0`
 
@@ -301,5 +301,19 @@
 `t_i ∈ T_d ⟹ S_i = n`
 
 `¬∃ t_i ∈ T_d : E_i ≠ 0 ∨ C_i ≠ 0.5 ∨ I_i ≠ 0 ∨ S_i ≠ n`
+
+### Hardened Gate Amendments (executable layer — v2.1)
+
+Enforced by `scripts/gate.py`, `engine.py --gate`, and `.cursor/hooks/`.
+
+`T_g = 1 ⟺ (t_i ∈ D_a ∧ A_u = 1)`
+`D_a = {t : t ∈ V ∧ t ⊨ GATE_BYPASS_AUDITED}`
+`A_u = 1 ⟺ ∃ h ∈ H_k : h ⊢ audit(subagent, triangulation)`
+`T_g = 0` default.
+
+`P_g = "scripts/gate.py"`
+`H_k = ".cursor/hooks.json"`
+`M_g = 1 ⟺ (AgentContext_i = 1 ∧ P_m ∈ A_p ∧ P_g ∈ A_p ∧ H_k ∈ A_p)`
+`E_i = 1 ⟺ (S_c ≥ 3 ∧ T_a = 1 ∧ M_g = 1)`
 ###...###.
 

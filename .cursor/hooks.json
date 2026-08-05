@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "python3 .cursor/hooks/session_start.py",
+        "timeout": 20
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "python3 .cursor/hooks/before_submit_prompt.py",
+        "matcher": "UserPromptSubmit",
+        "timeout": 60
+      }
+    ],
+    "subagentStart": [
+      {
+        "command": "python3 .cursor/hooks/subagent_start.py",
+        "timeout": 10,
+        "failClosed": false
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "python3 .cursor/hooks/pre_tool_use.py",
+        "matcher": "Task",
+        "timeout": 10,
+        "failClosed": false
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "python3 .cursor/hooks/before_shell.py",
+        "timeout": 10
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": "python3 .cursor/hooks/after_agent_response.py",
+        "matcher": "AgentResponse",
+        "timeout": 45
+      }
+    ],
+    "stop": [
+      {
+        "command": "python3 .cursor/hooks/stop_verify.py",
+        "timeout": 15,
+        "loop_limit": 2
+      }
+    ]
+  }
+}

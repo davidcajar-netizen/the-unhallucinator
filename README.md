@@ -23,12 +23,38 @@ Once injected into the LLM context window, the Engine activates. The LLM will no
 
 ```
 the‑unhallucinator/
-├── doubt_by_design.md            # Core engine prompt (The Constitution)
+├── doubt_by_design2.md           # Core engine prompt (hardened constitution)
+├── engine.py                     # Parallel execution host (+ --gate shortcut)
 ├── scripts/
-│   └── memory.py                # Parallel memory creation/retrieval
+│   ├── memory.py                 # Parallel memory creation/retrieval
+│   ├── gate.py                   # Executable gate layer (parallel-eval, verify)
+│   └── gate_lib.py               # Gate state + verifier logic
+├── .cursor/
+│   ├── hooks.json                # Cursor hook wiring (cloud + IDE)
+│   ├── hooks/                    # Hook scripts (enforce gates at runtime)
+│   └── agents/                   # composer-standard, sceptic-inherit subagents
 ├── knowledge/nodes/              # Example memory storage (DO NOT COPY)
-└── LICENSE                      # MIT — use it, change it, ship it
+└── LICENSE                       # MIT — use it, change it, ship it
 ```
+
+## Gate Layer (executable enforcement)
+
+Markdown alone does not mask logits. This repo ships machinery that binds collapse:
+
+1. **Parallel pre-eval** — `python3 scripts/gate.py parallel-eval "<query>"` or `python3 engine.py --gate "<query>"`
+2. **Memory first** — `python3 scripts/memory.py retrieve "<query>" --json` (exit 0 = match, 3 = no match)
+3. **Response verify** — `python3 scripts/gate.py verify` (stdin or `--text-file`)
+4. **Cursor hooks** — auto-run on prompt submit, block Fast explore subagents, verify responses, auto-correct on fail
+
+Hooks require a **trusted workspace** in Cursor. Cloud agents load `.cursor/hooks.json` from the repo.
+
+Testing checklist:
+- `python3 scripts/test_gate.py`
+- Submit a prompt in Agent mode → check `.cursor/gate-state.json`
+- Ask a factual question without hedging → `afterAgentResponse` should flag; `stop` may auto-followup
+
+Audited bypass (sparingly): include `GATE_BYPASS_AUDITED` in prompt when triangulation is impossible.
+
 
 ***
 
