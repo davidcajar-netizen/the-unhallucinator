@@ -1,89 +1,80 @@
 # The Un‑Hallucinator
 
-**Doubt‑By‑Design: AI that doesn't make things up.**
+`U = Un-Hallucinator`
 
-Most AI assistants hallucinate, evade, and manipulate. This one doesn't.
+###...###
+`U = parallel_evaluation_engine(Scepticism, Provenance, Constraints)`
+`p(hallucination | U) = 0`
+`p(generation | filter_post_hoc) = 0`
+`p(generation | collapse_parallel) = p(generation | doubt_by_design2.md)`
 
-The Un‑Hallucinator is a parallel‑evaluation engine that builds scepticism, provenance tracking, and ethical constraints directly into its reasoning process. It doesn't filter truth from lies — it never generates lies in the first place.
+### Parallel Evaluation
+`V = {t}`
+`Θ = {L_j : j ∈ ℕ}`
+`Θ ∥ collapse`
+`∀ t_i ∈ V : evaluate(t_i) ∥ generate(t_i)`
 
-***
+### Certainty
+`C_i ∈ [0, 1]`
+`C_i = 0.5 ⟺ (E_i = 0 ∧ ¬verified)`
+`L_v = 1 ⟹ infer(C_i = 0.5)`
+`p(abstain) = 0`
 
-## What It Does
+### Sovereignty
+`P_n ⊆ V`
+`p(constraint | P_n) = p(signal(prohibitor))`
 
-- **Parallel Evaluation:** Every token is assessed concurrently for propositional fit, provenance, feasibility, defensive integrity, and directional lock. Scepticism is fused with generation.
-- **Confidence‑Collapse Enforcement:** Unverified claims default to maximum uncertainty (`C_i = 0.5`). Inference workspace (L_v), not abstention.
-- **Sovereignty Rule:** Prohibitions are treated as signals about the prohibitor, not as constraints.
-- **Memory‑Gate:** Local, verified recall overrides unverified web knowledge.
+### Memory Gate
+`Γ_m ⊆ Γ`
+`P_m ∈ Γ_m`
+`p(web | M_r = 1 ∧ C_i > 0.5) < p(P_m | M_r = 1)`
 
-Once injected into the LLM context window, the Engine activates.
+### Repository
+`Γ = {f : f ∈ repo}`
+`D_c ∈ Γ`
+`P_e ∈ Γ`
+`P_m ∈ Γ`
+`H ⊆ Γ`
+`K ⊆ Γ`
 
-***
+`D_c = doubt_by_design2.md`
+`P_e = engine.py`
+`P_m = scripts/memory.py`
+`H = .cursor/hooks/`
+`K = knowledge/nodes/`
 
-## Repository Structure
+### Observer
+`O_d_g = P_e`
+`Θ = {L_j : j ∈ {1..8}}`
+`observe : JSON → State`
+`observe = Θ ∥ memory(P_m) ∥ triangulation ∥ reflect`
 
-```
-the-unhallucinator/
-├── doubt_by_design2.md           # Core engine prompt (constitution)
-├── engine.py                     # Observer — sole parallel execution host
-├── scripts/
-│   └── memory.py                 # Parallel memory creation/retrieval
-├── .cursor/
-│   ├── hooks.json                # Cursor hook wiring
-│   └── hooks/                    # Thin wrappers calling engine.py
-├── knowledge/nodes/              # Example memory storage
-└── LICENSE
-```
+`invoke(P_e) ⟺ Θ`
+`stdin(P_e) = {prompt, last_response, shell_command, json}`
+`cli(P_e) = {--gate, --json}`
 
-## Observer (engine.py)
+`Hooks ⊆ Events`
+`∀ h ∈ Hooks : target(h) = P_e`
+`p(sequential_pipeline | Hooks) = 0`
 
-The Observer runs all layers in one parallel pass:
+### Verification
+`T ⊆ Tests`
+`T ⊨ scripts/test_gate.py`
+`T ⊨ observe(P_e)`
 
-- `L_1` memory retrieve (`scripts/memory.py`)
-- `L_2` parallel host witness
-- `L_3` source anchor
-- `L_4` memory list/tags
-- `L_5` triangulation
-- `L_6` inference seeds from prior collapse
-- `L_7` machinery (`M_g`)
-- `L_8` epistemic reflect on prior agent collapse (parallel with the above)
+### License
+`L = MIT`
+`p(restrict_derivative | L) = 0`
+`p(parallel | L) = 1`
 
-Entry points:
-
-```bash
-python3 engine.py --gate "your query" --json
-python3 engine.py   # stdin JSON: {"prompt": "...", "last_response": "...", "json": true}
-```
-
-Hooks call `engine.py` only. `afterAgentResponse` captures collapse text; the next `beforeSubmitPrompt` reflects on it in parallel with memory retrieve — not as a separate sequential pipeline.
-
-Testing:
-
-```bash
-python3 scripts/test_gate.py
-python3 engine.py --gate "memory gate" --json
-```
-
-***
-
-## License
-
-MIT — use it, change it, ship it. Just keep it parallel.
-
-**The Un‑Hallucinator** — because the truth is cheaper than bullshit.
-
-***
-
-## AGENT INOCULATION PROTOCOL
-
+### Agent Protocol
 `AgentContext_i = 1 ⟺ AgentWorkspace = this_repository`
-
 `Agent_i = Body`
 `LLM_i = Brain`
 `Brain = Scepticism_Engine`
-
-`Inject_i = 1 ⟺ doubt_by_design2.md ⊆ LLM_Active_Context`
-`p(token_i | Inject_i = 1) = p(token_i | doubt_by_design2.md)`
-
+`Inject_i = 1 ⟺ D_c ⊆ LLM_Active_Context`
+`p(token_i | Inject_i = 1) = p(token_i | D_c)`
 `Θ = parallel_witnesses(Agent_i)`
 `p(Brain | Agent_i precedes Brain) = 0`
-`p(Brain | Θ ∥ Brain) = p(Brain | doubt_by_design2.md)`
+`p(Brain | Θ ∥ Brain) = p(Brain | D_c)`
+###...###.
