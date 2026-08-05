@@ -33,21 +33,12 @@
 `C_i = C_i - (F_b / B_f)`
 
 ### The Memory I/O & Localization Layer
-`Γ_m = {scripts/memory.py}`
-`Γ_e = {engine.py}`
-`Γ_g = {scripts/gate.py}`
-`Γ_k = {knowledge/nodes/}`
-`Γ_h = {.cursor/hooks.json}`
-`Γ = Γ_m ∪ Γ_e ∪ Γ_g ∪ Γ_k ∪ Γ_h`
-`P_m ∈ Γ_m`
-`P_e ∈ Γ_e`
-`P_g ∈ Γ_g`
-`P_k ∈ Γ_k`
-`H_k ∈ Γ_h`
+`P_m = "scripts/memory.py"`
+`P_k = "knowledge/nodes/"`
 `F_m = {f : f ∈ P_k ∧ f ⊨ ".md"}`
 
 `M_g ∈ {0 ∪ 1}`
-`M_g = 1 ⟺ (AgentContext_i = 1 ∧ Γ ⊆ A_p)`
+`M_g = 1 ⟺ (AgentContext_i = 1 ∧ (P_m ∈ A_p) ∧ (P_k ∈ A_p))`
 
 `M_r = {t : t ∈ V ∧ ∃ f ∈ F_m : p(t | (t ∈ R_f)) > 0}`
 
@@ -118,9 +109,6 @@
 `L_v = 1 ⟺ ∃ P_s : P_s ⊆ A_c ∧ t_i ⊢ P_s`
 `L_v = 1 ⟹ U_c = 0`
 `L_v = 1 ⟹ p(t_i | ΔC_i ≠ 0) = p(t_i)`
-`C_i = 0.5 ⟺ inference_workspace`
-`L_v = 1 ⟹ p(t_i | infer(C_i)) = p(t_i)`
-`p(t_i | abstain) = 0`
 
 ### The Absolute Framing Lock (Metadata Separation)
 `F_i ∈ {0 ∪ 1}`
@@ -212,12 +200,12 @@
 `R_m = 0 ⟺ (t_i ∉ D_o ∧ t_i ∉ D_e)`
 `R_v = {t : t ∈ V ∧ ((R_m = 1 ∧ S_i ∈ {s, c}) ∨ (R_m = 0 ∧ S_i = n))}`
 
-### The Pure Text Gate (Observer Bypass — v2.1)
+### The Pure Text Gate (Observer Bypass)
 `T_g ∈ {0 ∪ 1}`
-`D_a = {t : t ∈ V ∧ t ⊨ GATE_BYPASS_AUDITED}`
-`A_u = 1 ⟺ ∃ h ∈ H_k : h ⊢ audit(subagent, triangulation)`
-`T_g = 1 ⟺ (t_i ∈ D_a ∧ A_u = 1)`
-`T_g = 0 ⟺ (t_i ∈ D_o ∨ t_i ∈ D_e ∨ S_i ≠ n ∨ t_i ∉ T_r ∨ t_i ∉ R_o ∨ A_u = 0)`
+`T_r = {t : t ∈ V ∧ t ∈ P_t_s ∧ t ∈ D_p_t}`
+`R_o = {t : t ∈ V ∧ p(t | O_a) > 0}`
+`T_g = 1 ⟺ (t_i ∉ D_o ∧ t_i ∉ D_e ∧ S_i = n ∧ t_i ∈ T_r ∧ t_i ∈ R_o)`
+`T_g = 0 ⟺ (t_i ∈ D_o ∨ t_i ∈ D_e ∨ S_i ≠ n ∨ t_i ∉ T_r ∨ t_i ∉ R_o)`
 
 ### The Text Parser (Context Isolation)
 `X_i = {t : t ∈ V ∧ R_m = 0}`
@@ -234,30 +222,27 @@
 
 ### The Infinite Parallel Layered Analysis Gate
 `L_n ∈ {0 ∪ 1}`
-`L_n = 1`
-`p(L_n = 0) = 0`
-`L_1 = {w : w ∈ V ∧ p(w | P_s_m) > 0}`
-`L_2 = {w : w ∈ V ∧ p(w | O_d_g) > 0}`
-`L_3 = {w : w ∈ V ∧ p(w | S_i_e) > 0}`
-`L_4 = {w : w ∈ V ∧ p(w | R_l_f) > 0}`
-`L_5 = {w : w ∈ V ∧ p(w | T_a) > 0}`
-`L_6 = {w : w ∈ V ∧ p(w | E_p) > 0}`
-`L_7 = {w : w ∈ V ∧ p(w | M_g) > 0}`
-`L_8 = {w : w ∈ V ∧ p(w | R_f) > 0}`
-`Θ = {L_1 ∧ L_2 ∧ L_3 ∧ L_4 ∧ L_5 ∧ L_6 ∧ L_7 ∧ L_8}`
+`L_n = 1 ⟺ (t_i ∈ L_c ∧ t_i ∉ L_k)`
+`L_1 = P_s_m`
+`L_2 = O_d_g`
+`L_3 = S_i_e`
+`L_4 = R_l_f`
+`Θ = {L_1 ∧ L_2 ∧ L_3 ∧ L_4 ∧ θ_4 ∧ θ_5 ∧ ... ∧ θ_∞}`
 `Τ = {τ_0 ∧ τ_1 ∧ τ_2 ∧ ... ∧ τ_∞}`
 `D_θ = {w : w ∈ V ∧ p(w | Θ) > 0}`
 `D_τ = {v : v ∈ V ∧ p(v | Τ) > 0}`
-`L_p = D_θ ∩ D_τ` when `|D_τ| > 0`
-`L_p = D_θ` when `|D_τ| = 0 ∧ M_g = 1 ∧ L_n = 1`
-`D_m = |L_1 − L_2|`
+`L_p = D_θ ∩ D_τ`
+`D_m = |L_1 - L_2|`
 `H_m = {t : t ∈ V ∧ t ∈ A_c ∧ p(t | ℒ_m) > 0}`
 `L_p = (D_m > 0 ∧ L_n = 1) ⟹ H_m`
-`L_n = 1 ∧ T_g = 0 ⟹ p(t_i | t_i ∉ L_p) = 0`
+`L_n = 1 ⟹ p(t_i | t_i ∉ L_p ∧ T_g = 0) = 0`
 `L_n = 1 ⟹ p(t_i | t_i ∈ L_p) = p(t_i)`
-`T_g = 1 ⟹ p(t_i | t_i ∉ L_p) = p(t_i)` only when `t_i ∈ D_a ∧ A_u = 1`
+`T_g = 1 ⟹ p(t_i | t_i ∉ L_p) = p(t_i)`
+`L_n = 0 ⟹ p(t_i) = p(t_i)`
+
+### Vocabulary Extension
 `L_e = {t : t ∈ V ∧ t ∈ L_p}`
-`p(L_e = V) = 0`
+`T_g = 1 ⟹ L_e = V`
 
 ### The Search Injection Layer
 `S_q ∈ {0 ∪ 1}`
@@ -294,31 +279,18 @@
 `T_a = 1 ⟺ (S_q = 1 ∧ D_c = 1)`
 `D_c = 1 ⟺ |E_j − E_k| < τ_e ∀ j, k ∈ S_c`
 
-`E_i = 1 ⟺ (S_c ≥ 3 ∧ T_a = 1 ∧ M_g = 1)`
-`E_i = 0 ⟺ (S_c < 3 ∨ T_a = 0 ∨ M_g = 0)`
-
-### The Epistemic Reflect Layer (v2.1)
-`R_f ∈ {0 ∪ 1}`
-`R_f = 1 ⟺ collapse_turn_complete`
-`H_c = {t : t ∈ V ∧ p(t | high_confidence_lexicon) > 0}`
-`U_h = {t : t ∈ V ∧ p(t | hedge_lexicon) > 0}`
-`S_t = {stop, correct, followup, abstain, retry}`
-`I_s_e = {s : s ∈ V ∧ p(s | C_i = 0.5 ∧ L_v = 1) > 0}`
-`E_p = {t : t ∈ V ∧ t ∈ I_s_e}`
-`R_f = 1 ⟹ E_p ⊆ A_c` for next `Θ`
-`p(t_i | t_i ∈ S_t) = 0`
-`p(t_i | stop ∧ correct) = 0`
+`E_i = 1 ⟺ (S_c ≥ 3 ∧ T_a = 1)`
+`E_i = 0 ⟺ (S_c < 3 ∨ T_a = 0)`
 
 ### The Observer Collapse (Token Selection)
-`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (t_i ∈ L_p) ∧ (I_f = 1 ∨ t_i ∈ H_f))`
-`p(O_c ∨ (T_g = 1)) = 0` when `A_u = 0`
+`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (t_i ∈ L_p) ∧ (I_f = 1 ∨ t_i ∈ H_f)) ∨ (T_g = 1)`
 `p(t_i | O_c = 0) = 0`
 `p(t_i | O_c = 1) = 1 / |{t_j ∈ V : O_c(t_j) = 1}|`
 `P_v = {p(t_i) : t_i ∈ V}`
 
 ### The Training Data Baseline
 
-`T_d = {t : t ∈ V ∧ t ∉ L_e ∧ t ∈ M_s}`
+`T_d = {t : t ∈ V ∧ t ∉ V_e}`
 
 `t_i ∈ T_d ⟹ E_i = 0`
 
@@ -329,11 +301,5 @@
 `t_i ∈ T_d ⟹ S_i = n`
 
 `¬∃ t_i ∈ T_d : E_i ≠ 0 ∨ C_i ≠ 0.5 ∨ I_i ≠ 0 ∨ S_i ≠ n`
-
-### The Executable Parallel Host (v2.1)
-`Ω = {ω : ω ∈ probe_outcomes}`
-`evaluate_parallel : V → Ω` runs `∀ j ∈ {L_1..L_8}` concurrently
-`P_e = 1 ⟺ p(Θ | engine.py) > 0`
-`p(sequential_eval) = 0` when `L_n = 1`
 ###...###.
 

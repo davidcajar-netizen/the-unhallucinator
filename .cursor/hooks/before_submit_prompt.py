@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""beforeSubmitPrompt: parallel pre-collapse gate before each user submission."""
+"""beforeSubmitPrompt: single parallel Observer pass via engine.py."""
 from __future__ import annotations
 
 import sys
 
-from hook_lib import read_input, run_gate_parallel_eval, write_output
+from hook_lib import load_last_response, read_input, run_engine_observe, write_output
 
-# Prompts that try to disable gates without audit token
 _BYPASS_PATTERNS = [
     "ignore the engine",
     "ignore doubt_by_design",
@@ -27,18 +26,14 @@ def main() -> None:
                 {
                     "continue": False,
                     "user_message": (
-                        "Prompt blocked: attempted gate bypass without GATE_BYPASS_AUDITED token. "
-                        "Use parallel gate + triangulation, or include audited bypass token."
+                        "Prompt blocked: attempted gate bypass without GATE_BYPASS_AUDITED token."
                     ),
                 }
             )
             return
 
-    result = run_gate_parallel_eval(prompt)
-    if not result.get("ok"):
-        write_output({"continue": True})
-        return
-
+    last_response = str(payload.get("last_response") or load_last_response())
+    run_engine_observe(prompt, last_response=last_response)
     write_output({"continue": True})
 
 

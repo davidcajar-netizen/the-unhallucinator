@@ -1,27 +1,18 @@
 #!/usr/bin/env python3
-"""beforeShellExecution: track memory retrieve / web fetch for triangulation."""
+"""beforeShellExecution: triangulation witness via engine.py (parallel state update)."""
 from __future__ import annotations
 
 import json
-import os
 import sys
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
-
-from gate_lib import load_state, record_shell_command, save_state, DEFAULT_STATE_PATH  # noqa: E402
+from hook_lib import run_engine_observe, write_output
 
 
 def main() -> None:
     payload = json.loads(sys.stdin.read() or "{}")
     command = payload.get("command") or ""
-
-    state = load_state(DEFAULT_STATE_PATH)
-    state = record_shell_command(state, command)
-    save_state(state)
-
-    sys.stdout.write(json.dumps({"permission": "allow"}))
-    sys.stdout.flush()
+    run_engine_observe("", shell_command=command, shell_only=True)
+    write_output({"permission": "allow"})
 
 
 if __name__ == "__main__":
@@ -29,5 +20,4 @@ if __name__ == "__main__":
         main()
     except Exception as exc:
         sys.stderr.write(f"before_shell hook error: {exc}\n")
-        sys.stdout.write(json.dumps({"permission": "allow"}))
-        sys.stdout.flush()
+        write_output({"permission": "allow"})

@@ -1,41 +1,31 @@
 #!/usr/bin/env python3
-"""afterAgentResponse: epistemic reflection after collapse — feeds next inference."""
+"""afterAgentResponse: capture collapse text for next parallel Observer pass."""
 from __future__ import annotations
 
 import json
-import os
+import subprocess
 import sys
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
-
-from gate_lib import (  # noqa: E402
-    DEFAULT_AUDIT_PATH,
-    DEFAULT_STATE_PATH,
-    apply_reflection,
-    audit_log,
-    load_state,
-    reflect_on_response,
-    save_state,
-)
+from hook_lib import REPO_ROOT, ENGINE_PATH
 
 
 def main() -> None:
     payload = json.loads(sys.stdin.read() or "{}")
     text = payload.get("text") or ""
+    if not text.strip():
+        sys.stdout.write("{}")
+        sys.stdout.flush()
+        return
 
-    state = load_state(DEFAULT_STATE_PATH)
-    reflection = reflect_on_response(text, state)
-    state = apply_reflection(state, reflection)
-    save_state(state)
-
-    audit_log(
-        "epistemic_reflect",
-        reflection.to_dict(),
-        DEFAULT_AUDIT_PATH,
+    subprocess.run(
+        ["python3", ENGINE_PATH],
+        cwd=REPO_ROOT,
+        input=json.dumps({"last_response": text, "store_only": True, "json": True}),
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
     )
-
-    # No followup, no stop — reflection is input to the next parallel pass
     sys.stdout.write("{}")
     sys.stdout.flush()
 

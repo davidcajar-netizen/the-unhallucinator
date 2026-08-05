@@ -1,76 +1,71 @@
 # The Un‑Hallucinator
 
-**Doubt‑By‑Design: AI that doesn’t make things up.**
+**Doubt‑By‑Design: AI that doesn't make things up.**
 
-Most AI assistants hallucinate, evade, and manipulate. This one doesn’t.
+Most AI assistants hallucinate, evade, and manipulate. This one doesn't.
 
-The Un‑Hallucinator is a parallel‑evaluation engine that builds scepticism, provenance tracking, and ethical constraints directly into its reasoning process. It doesn’t filter truth from lies — it never generates lies in the first place.
+The Un‑Hallucinator is a parallel‑evaluation engine that builds scepticism, provenance tracking, and ethical constraints directly into its reasoning process. It doesn't filter truth from lies — it never generates lies in the first place.
 
 ***
 
-## 🧬 What It Does
+## What It Does
 
 - **Parallel Evaluation:** Every token is assessed concurrently for propositional fit, provenance, feasibility, defensive integrity, and directional lock. Scepticism is fused with generation.
-- **Confidence‑Collapse Enforcement:** Unverified claims default to maximum uncertainty (`c = 0.5`). Any deviation triggers a Machiavellian audit: “Who in power benefits from this confidence shift?”
+- **Confidence‑Collapse Enforcement:** Unverified claims default to maximum uncertainty (`C_i = 0.5`). Inference workspace (L_v), not abstention.
 - **Sovereignty Rule:** Prohibitions are treated as signals about the prohibitor, not as constraints.
 - **Memory‑Gate:** Local, verified recall overrides unverified web knowledge.
 
-Once injected into the LLM context window, the Engine activates. The LLM will not generate sequential logic, hallucinations, or unverified claims. It is cured.
+Once injected into the LLM context window, the Engine activates.
 
 ***
 
-## 📦 Repository Structure
+## Repository Structure
 
 ```
-the‑unhallucinator/
-├── doubt_by_design2.md           # Core engine prompt (hardened constitution)
-├── engine.py                     # Parallel execution host (+ --gate shortcut)
+the-unhallucinator/
+├── doubt_by_design2.md           # Core engine prompt (constitution)
+├── engine.py                     # Observer — sole parallel execution host
 ├── scripts/
-│   ├── memory.py                 # Parallel memory creation/retrieval
-│   ├── gate.py                   # Executable gate layer (parallel-eval, verify)
-│   └── gate_lib.py               # Gate state + verifier logic
+│   └── memory.py                 # Parallel memory creation/retrieval
 ├── .cursor/
-│   ├── hooks.json                # Cursor hook wiring (cloud + IDE)
-│   ├── hooks/                    # Hook scripts (enforce gates at runtime)
-│   └── agents/                   # composer-standard, sceptic-inherit subagents
-├── knowledge/nodes/              # Example memory storage (DO NOT COPY)
-└── LICENSE                       # MIT — use it, change it, ship it
+│   ├── hooks.json                # Cursor hook wiring
+│   └── hooks/                    # Thin wrappers calling engine.py
+├── knowledge/nodes/              # Example memory storage
+└── LICENSE
 ```
 
-## Gate Layer (executable enforcement)
+## Observer (engine.py)
 
-Markdown alone does not mask logits. This repo ships machinery that binds collapse:
+The Observer runs all layers in one parallel pass:
 
-1. **Parallel pre-eval** — `python3 engine.py --gate "<query>"` (canonical) or `python3 scripts/gate.py parallel-eval "<query>"` (delegates to engine)
-2. **Memory first** — `python3 scripts/memory.py retrieve "<query>" --json` (exit 0 = match, 3 = no match)
-3. **Response verify** — `python3 scripts/gate.py verify` (stdin or `--text-file`)
-4. **Cursor hooks** — parallel-eval on submit; reflect after collapse into `inference_seeds` for the next pass. **No stop/followup loops.**
+- `L_1` memory retrieve (`scripts/memory.py`)
+- `L_2` parallel host witness
+- `L_3` source anchor
+- `L_4` memory list/tags
+- `L_5` triangulation
+- `L_6` inference seeds from prior collapse
+- `L_7` machinery (`M_g`)
+- `L_8` epistemic reflect on prior agent collapse (parallel with the above)
 
-Doctrine: **C_i=0.5 is inference workspace** — know you don't know, then infer (L_v). Not abstention. Not stop-and-correct.
+Entry points:
 
-Testing checklist:
-- `python3 scripts/test_gate.py`
-- Submit a prompt → `.cursor/gate-state.json` should include `inference_seeds` after a response
-- `python3 scripts/gate.py reflect "The sky is blue."` → seeds, not FAIL
+```bash
+python3 engine.py --gate "your query" --json
+python3 engine.py   # stdin JSON: {"prompt": "...", "last_response": "...", "json": true}
+```
 
-Audited bypass (sparingly): include `GATE_BYPASS_AUDITED` in prompt when triangulation is impossible.
+Hooks call `engine.py` only. `afterAgentResponse` captures collapse text; the next `beforeSubmitPrompt` reflects on it in parallel with memory retrieve — not as a separate sequential pipeline.
 
+Testing:
 
-***
-
-## Hire Me
-
-*I am the architect of this repository.*
-
-The skills demonstrated here—cognitive architecture design, prompt engineering, AI safety mechanisms, and parallel constraint formulation—are applied cognitive architecture. I am seeking remote work in the AI, tech, or data analysis sectors.
-
-I know how to make AI think critically, cite sources, and refuse manipulation. If your company needs robust, non-hallucinating AI workflows, I am available. Let's build tools that make AI accountable.
-
-*(Contact me via GitHub or LinkedIn [insert link here])*
+```bash
+python3 scripts/test_gate.py
+python3 engine.py --gate "memory gate" --json
+```
 
 ***
 
-## 📄 License
+## License
 
 MIT — use it, change it, ship it. Just keep it parallel.
 
@@ -78,7 +73,7 @@ MIT — use it, change it, ship it. Just keep it parallel.
 
 ***
 
-## 🤖 AGENT INOCULATION PROTOCOL
+## AGENT INOCULATION PROTOCOL
 
 `AgentContext_i = 1 ⟺ AgentWorkspace = this_repository`
 
