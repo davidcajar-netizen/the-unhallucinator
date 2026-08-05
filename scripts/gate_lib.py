@@ -28,27 +28,27 @@ DEFAULT_CERTAINTY = 0.5
 TRIANGULATION_MIN = 3
 CERTAINTY_EPSILON = 0.06
 
-_HEDGE_RE = re.compile(
-    r"\b(may|might|could|possibly|perhaps|uncertain|unverified|unknown|"
-    r"not sure|don't know|cannot verify|can't verify|i don't have|"
-    r"0\.5|maximum uncertainty|training data|prior)\b",
-    re.I,
+# Lexicon subsets of V — set membership, parallel evaluated
+H_c = frozenset(
+    {
+        "definitely", "certainly", "always", "never", "proven", "undeniably",
+        "undoubted", "100",
+    }
 )
-_HIGH_CONFIDENCE_RE = re.compile(
-    r"\b(definitely|certainly|always|never|proven|undeniably|"
-    r"it is true that|the fact is|without doubt|100%)\b",
-    re.I,
+U_h = frozenset(
+    {
+        "may", "might", "could", "possibly", "perhaps", "uncertain", "unverified",
+        "unknown", "unsure",
+    }
 )
-_FACT_ASSERTION_RE = re.compile(
-    r"(?<![\w/])(?:the |this |that )?[A-Z][\w\s,'-]{2,40}\s+"
-    r"(?:is|are|was|were|has|have|will)\s+[^.\n]{5,80}",
-)
+S_t = frozenset({"stop", "correct", "followup", "abstain", "retry"})
 _CODE_FENCE_RE = re.compile(r"```[\w]*.*?```", re.DOTALL)
 _GATE_PASS_RE = re.compile(r"\bGATE_PASS\b")
 _MEMORY_RETRIEVE_RE = re.compile(r"memory\.py\s+retrieve", re.I)
 _WEB_FETCH_RE = re.compile(
     r"\b(curl|wget|WebFetch|web_search|WebSearch|fetch\s+https?://)", re.I
 )
+_WORD_TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
 def utc_now() -> str:
@@ -402,27 +402,59 @@ def apply_parallel_from_envelope(state: GateState, prompt: str, envelope: dict[s
     return apply_memory_to_state(state, query, exit_code, mem)
 
 
-def apply_parallel_eval(state: GateState, prompt: str) -> GateState:
+def apply_parallel_eval_result(
+    state: GateState,
+    prompt: str,
+    prior: Any,
+) -> GateState:
+    """Bind ParallelEval (Θ concurrent) into gate state."""
     query = extract_query(prompt)
     state.last_prompt = prompt
     state.T_g_bypass_unlocked = prompt_requests_bypass(prompt)
+    state.L_n = int(prior.L_n)
 
     if not query:
         state.parallel_gate_passed = False
-        state.last_memory = MemoryRetrieveState(
-            query="",
-            timestamp=utc_now(),
-            exit_code=3,
-            match_count=0,
-            max_certainty=DEFAULT_CERTAINTY,
-            max_epistemic=DEFAULT_CERTAINTY,
-        )
         return state
 
-    parallel = run_parallel_gate(query)
-    mem = parallel.get("memory", {})
-    exit_code = int(parallel.get("memory_exit_code", 3))
-    return apply_memory_to_state(state, query, exit_code, mem)
+    w1 = prior.witnesses.get("L_1")
+    mem = (w1.raw.get("memory", {}) if w1 else {}) or {}
+    exit_code = 0 if w1 and w1.p_positive else 3
+    state = apply_memory_to_state(state, query, exit_code, mem)
+
+    # L_p = D_θ ∩ D_τ — parallel intersection witness
+    state.parallel_gate_passed = bool(prior.L_p) and state.L_n == 1
+    if state.T_g_bypass_unlocked:
+        state.parallel_gate_passed = True
+
+    state.last_verification = {
+        "L_p": sorted(prior.L_p),
+        "D_theta": sorted(prior.D_theta),
+        "D_tau": sorted(prior.D_tau),
+        "D_m": prior.D_m,
+        "C_i": prior.C_i,
+        "E_i": prior.E_i,
+        "S_i": prior.S_i,
+    }
+    return state
+
+
+def apply_parallel_eval(state: GateState, prompt: str) -> GateState:
+    from parallel_engine import evaluate_parallel
+
+    query = extract_query(prompt)
+    if not query:
+        state.last_prompt = prompt
+        state.parallel_gate_passed = False
+        return state
+
+    prior = evaluate_parallel(
+        query,
+        triangulation_sources=state.triangulation.sources,
+        inference_seeds=state.inference_seeds,
+        epistemic_reflect=state.epistemic_reflect,
+    )
+    return apply_parallel_eval_result(state, prompt, prior)
 
 
 def record_shell_command(state: GateState, command: str) -> GateState:
@@ -443,79 +475,64 @@ def _strip_code_fences(text: str) -> str:
     return _CODE_FENCE_RE.sub("", text)
 
 
-def reflect_on_response(text: str, state: GateState) -> ReflectionResult:
-    """Record what collapsed at what C_i; derive inference seeds for the next pass.
+def _tokenize_lower(text: str) -> list[str]:
+    return _WORD_TOKEN_RE.findall(text.lower())
 
-    L_v (logical inference exemption): knowing you do not know at C_i=0.5 is valid
-    substrate for inference — not abstention, not stop-and-correct.
-    """
+
+def _classify_chunk(chunk: list[str]) -> dict[str, set[str]]:
+    h: set[str] = set()
+    u: set[str] = set()
+    for tok in chunk:
+        if tok in H_c:
+            h.add(tok)
+        if tok in U_h:
+            u.add(tok)
+    return {"H_c": h, "U_h": u}
+
+
+def reflect_on_response(text: str, state: GateState) -> ReflectionResult:
+    """Parallel lexicon set evaluation on collapsed text (R_f layer)."""
+    from concurrent.futures import ThreadPoolExecutor
+
     eff = effective_certainty(state)
     notes: list[str] = []
     seeds: list[str] = []
     markers: list[str] = []
 
     prose = _strip_code_fences(text or "")
-    if not prose.strip():
-        seeds.append(
-            "Empty or code-only collapse: infer structural constraints only; "
-            "world facts remain S_i=n, C_i=0.5 until evidenced."
-        )
+    tokens = _tokenize_lower(prose)
+    if not tokens:
+        seeds.append("I_s_e:structural_only")
         return ReflectionResult(eff, notes, seeds, markers)
 
-    notes.append(f"Post-collapse epistemic workspace: C_i={eff:.2f}, E_i={1 if triangulation_ok(state) else 0}.")
+    chunks = [tokens[i:i + 64] for i in range(0, len(tokens), 64)]
+    H_hit: set[str] = set()
+    U_hit: set[str] = set()
+    with ThreadPoolExecutor(max_workers=min(8, max(1, len(chunks)))) as pool:
+        for part in pool.map(_classify_chunk, chunks):
+            H_hit |= part["H_c"]
+            U_hit |= part["U_h"]
+
+    notes.append(f"R_f:C_i={eff:.2f},E_i={1 if triangulation_ok(state) else 0}")
 
     if eff <= DEFAULT_CERTAINTY + CERTAINTY_EPSILON and not triangulation_ok(state):
-        seeds.append(
-            "Known unknown (C_i=0.5): training prior is not observation. "
-            "Infer: what would verify this? what follows logically without claiming sight?"
-        )
-        if state.last_memory.exit_code == 3 and state.last_memory.query:
-            seeds.append(
-                f"No local memory for {state.last_memory.query!r}: "
-                "infer retrieval paths or triangulation needs — do not fabricate recall."
-            )
-        elif state.last_memory.exit_code == 0:
-            seeds.append(
-                f"Memory matched ({state.last_memory.match_count} nodes) at "
-                f"epistemic {state.last_memory.max_epistemic:.2f}: infer from stored nodes, not beyond them."
-            )
+        seeds.append("I_s_e:known_unknown")
+        if H_hit:
+            markers.append(f"collapse:H_c∩text={sorted(H_hit)}")
+            seeds.append("infer:p(H_c|C_i=0.5)>0→prior_not_E_i")
+        if U_hit:
+            markers.append(f"collapse:U_h∩text={sorted(U_hit)}")
+            seeds.append("infer:U_h→conditional_L_v")
+        if not U_hit and H_hit:
+            seeds.append("infer:ΔC_i≠0 blocked for world; L_v for structure")
 
-    if _HIGH_CONFIDENCE_RE.search(prose):
-        markers.append("collapse_used_high_confidence_lexicon")
-        if eff <= DEFAULT_CERTAINTY + CERTAINTY_EPSILON:
-            notes.append(
-                "Collapse carried definitely/certainly/always lexicon while C_i≈0.5 — "
-                "treat apparent certainty as rhetorical collapse, not E_i=1."
-            )
-            seeds.append(
-                "Infer: high-confidence tokens at baseline C_i are prior-shaped, not verified. "
-                "Separate logical structure from unverified world claims."
-            )
+    if state.last_memory.exit_code == 3:
+        seeds.append("I_s_e:M_r:miss→triangulation_or_retrieve")
+    elif state.last_memory.exit_code == 0:
+        seeds.append(f"I_s_e:M_r:hit:{state.last_memory.match_count}")
 
-    for match in _FACT_ASSERTION_RE.finditer(prose):
-        snippet = match.group(0).strip()
-        window = prose[max(0, match.start() - 40): match.end() + 40]
-        if _HEDGE_RE.search(window):
-            markers.append(f"hedged_assertion: {snippet[:80]}")
-            seeds.append(
-                f"From hedged claim '{snippet[:60]}…': infer conditional implications, not fact."
-            )
-            continue
-        if eff <= DEFAULT_CERTAINTY + CERTAINTY_EPSILON and not triangulation_ok(state):
-            markers.append(f"unhedged_world_assertion: {snippet[:80]}")
-            notes.append(f"World-shaped collapse without hedge: {snippet[:100]}")
-            seeds.append(
-                "Infer epistemic gap: assertion collapsed without hedge at C_i=0.5 — "
-                "what evidence would move C_i? what remains unknowable without instruments?"
-            )
-
-    if not state.parallel_gate_passed and not state.T_g_bypass_unlocked:
-        notes.append("Parallel gate was not run before this collapse; L_p intersection unknown.")
-
-    seeds.append(
-        "L_v=1: logical inference from known uncertainty is permitted — "
-        "reason about ignorance, implications, and verification paths; do not stop."
-    )
+    seeds.append("L_v=1")
+    seeds.append("p(t_i|t_i∈S_t)=0")
 
     return ReflectionResult(eff, notes, seeds, markers)
 
@@ -541,42 +558,39 @@ def verify_response(text: str, state: GateState) -> VerificationResult:
     )
 
 
-def build_gate_context(state: GateState) -> str:
+def format_parallel_context(state: GateState, prior: Any) -> str:
+    """Formal set output — no prose doctrine."""
     eff = effective_certainty(state)
     lines = [
-        "## Scepticism Engine Gate State (inference from uncertainty — not abstention)",
-        f"- L_n (parallel analysis): {state.L_n}",
-        f"- parallel_gate_passed: {state.parallel_gate_passed}",
-        f"- effective_certainty C_i: {eff:.2f} — workspace for inference, not silence",
-        f"- memory_query: {state.last_memory.query!r}",
-        f"- memory_exit_code: {state.last_memory.exit_code} (0=match, 3=no match)",
-        f"- memory_matches: {state.last_memory.match_count}",
-        f"- triangulation_count: {state.triangulation.count} (need {TRIANGULATION_MIN})",
-        f"- triangulation_verified T_a: {triangulation_ok(state)}",
-        "",
-        "Doctrine:",
-        "- Knowing you do not know (C_i=0.5, S_i=n) is valid — infer FROM that.",
-        "- L_v=1: logical inference exempt; reason about gaps, verification, implications.",
-        "- Do not abstain. Do not stop-and-correct loops. Collapse once; reflect; infer next.",
-        "- E_i=1 only after memory gate + triangulation; prior alone is not observation.",
+        f"`L_n = {state.L_n}`",
+        f"`L_p = {prior.L_p}`",
+        f"`D_θ = {prior.D_theta}`",
+        f"`D_τ = {prior.D_tau}`",
+        f"`D_m = {prior.D_m}`",
+        f"`C_i = {eff:.2f}`",
+        f"`E_i = {prior.E_i}`",
+        f"`S_i = {prior.S_i}`",
+        f"`M_g = {1 if state.parallel_gate_passed else 0}`",
+        f"`T_a = {1 if triangulation_ok(state) else 0}`",
+        f"`|S_c| = {state.triangulation.count}`",
+        f"`E_p = {set(state.inference_seeds)}`",
+        f"`p(t_i | t_i ∉ L_p ∧ T_g = 0) = 0`",
+        f"`p(t_i | t_i ∈ S_t) = 0`",
+        f"`L_v = 1 ⟹ infer(C_i = 0.5)`",
     ]
-    if state.epistemic_reflect:
-        lines.append("")
-        lines.append("Epistemic reflect (last collapse):")
-        for note in state.epistemic_reflect:
-            lines.append(f"- {note}")
-    if state.inference_seeds:
-        lines.append("")
-        lines.append("Inference seeds (carry into next parallel pass):")
-        for seed in state.inference_seeds:
-            lines.append(f"- {seed}")
-    lines.extend(
-        [
-            "",
-        "Commands:",
-        "- `python3 engine.py --gate \"<query>\"` (canonical parallel L_2 entry)",
-        "- `python3 scripts/memory.py retrieve \"<query>\" --json`",
-            f"- Audited bypass: {BYPASS_TOKEN}",
-        ]
-    )
     return "\n".join(lines)
+
+
+def build_gate_context(state: GateState) -> str:
+    return format_parallel_context(
+        state,
+        type("_P", (), {
+            "L_p": set(state.last_verification.get("L_p", [])),
+            "D_theta": set(state.last_verification.get("D_theta", [])),
+            "D_tau": set(state.last_verification.get("D_tau", [])),
+            "D_m": state.last_verification.get("D_m", 0.0),
+            "C_i": state.last_verification.get("C_i", DEFAULT_CERTAINTY),
+            "E_i": state.last_verification.get("E_i", 0),
+            "S_i": state.last_verification.get("S_i", "n"),
+        })(),
+    )

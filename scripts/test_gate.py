@@ -30,10 +30,10 @@ class GateLibTests(unittest.TestCase):
     def test_reflect_produces_inference_seeds_at_baseline(self):
         state = GateState()
         state.parallel_gate_passed = True
-        text = "The sky is definitely blue without any doubt."
+        text = "definitely certainly always"
         reflection = reflect_on_response(text, state)
         self.assertTrue(reflection.inference_seeds)
-        self.assertIn("L_v=1", reflection.inference_seeds[-1])
+        self.assertIn("L_v=1", reflection.inference_seeds)
 
     def test_verify_never_fails(self):
         state = GateState()
@@ -43,9 +43,9 @@ class GateLibTests(unittest.TestCase):
 
     def test_reflect_passes_hedged_uncertainty(self):
         state = GateState()
-        text = "I cannot verify from direct observation; training prior may be wrong at C_i=0.5."
+        text = "may might could uncertain unverified"
         reflection = reflect_on_response(text, state)
-        self.assertTrue(any("C_i=0.5" in s for s in reflection.inference_seeds))
+        self.assertTrue(any("U_h" in m for m in reflection.collapse_markers))
 
     def test_state_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmp:
