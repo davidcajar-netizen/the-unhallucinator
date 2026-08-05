@@ -14,9 +14,9 @@ import os
 import sys
 
 from gate_lib import (
+    REPO_ROOT,
     DEFAULT_AUDIT_PATH,
     DEFAULT_STATE_PATH,
-    apply_parallel_eval,
     apply_reflection,
     audit_log,
     build_gate_context,
@@ -28,23 +28,21 @@ from gate_lib import (
 
 
 def cmd_parallel_eval(args: argparse.Namespace) -> int:
-    state = load_state(args.state_path)
-    state = apply_parallel_eval(state, args.query or "")
-    save_state(state, args.state_path)
+    """Delegate to engine.py --gate (canonical parallel entry)."""
+    import subprocess
+
+    query = args.query or ""
+    cmd = ["python3", os.path.join(REPO_ROOT, "engine.py"), "--gate", query]
+    if args.json:
+        cmd.append("--json")
+    proc = subprocess.run(cmd, cwd=REPO_ROOT, check=False)
+    if proc.returncode != 0:
+        return proc.returncode
     audit_log(
-        "parallel_eval",
-        {
-            "query": state.last_memory.query,
-            "parallel_gate_passed": state.parallel_gate_passed,
-            "memory_exit_code": state.last_memory.exit_code,
-            "effective_certainty": state.last_memory.max_epistemic,
-        },
+        "parallel_eval_via_engine",
+        {"query": query},
         args.audit_path,
     )
-    if args.json:
-        print(json.dumps(state.to_dict(), indent=2))
-    else:
-        print(build_gate_context(state))
     return 0
 
 

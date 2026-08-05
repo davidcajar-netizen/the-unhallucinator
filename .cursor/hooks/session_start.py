@@ -14,8 +14,7 @@ CONSTITUTION = os.path.join(REPO_ROOT, "doubt_by_design2.md")
 def main() -> None:
     context_parts = [
         "Scepticism Engine gate layer is ACTIVE for this repository.",
-        "Run parallel pre-collapse before factual world claims.",
-        "Command: python3 scripts/gate.py parallel-eval \"<query>\"",
+        "Execute parallel L_2 before collapse: python3 engine.py --gate \"<query>\"",
         "Memory: python3 scripts/memory.py retrieve \"<query>\" --json",
     ]
 

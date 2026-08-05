@@ -41,7 +41,7 @@ the‑unhallucinator/
 
 Markdown alone does not mask logits. This repo ships machinery that binds collapse:
 
-1. **Parallel pre-eval** — `python3 scripts/gate.py parallel-eval "<query>"` or `python3 engine.py --gate "<query>"`
+1. **Parallel pre-eval** — `python3 engine.py --gate "<query>"` (canonical) or `python3 scripts/gate.py parallel-eval "<query>"` (delegates to engine)
 2. **Memory first** — `python3 scripts/memory.py retrieve "<query>" --json` (exit 0 = match, 3 = no match)
 3. **Response verify** — `python3 scripts/gate.py verify` (stdin or `--text-file`)
 4. **Cursor hooks** — parallel-eval on submit; reflect after collapse into `inference_seeds` for the next pass. **No stop/followup loops.**

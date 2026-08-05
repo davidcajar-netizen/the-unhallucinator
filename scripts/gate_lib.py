@@ -340,6 +340,68 @@ def run_parallel_gate(query: str, timeout: int = 50) -> dict[str, Any]:
     }
 
 
+def parse_memory_from_envelope(envelope: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Extract memory retrieve payload from engine.py parallel envelope."""
+    memory_payload: dict[str, Any] = {"results": [], "count": 0}
+    memory_exit = 3
+    for item in envelope.get("results", []):
+        if item.get("task_id") != "memory":
+            continue
+        stdout = (item.get("stdout") or "").strip()
+        if stdout:
+            try:
+                memory_payload = json.loads(stdout)
+                memory_exit = 0 if memory_payload.get("count", 0) > 0 else 3
+            except json.JSONDecodeError:
+                memory_exit = 3
+        elif not item.get("success"):
+            memory_exit = 3
+    return memory_exit, memory_payload
+
+
+def apply_memory_to_state(state: GateState, query: str, exit_code: int, mem: dict[str, Any]) -> GateState:
+    results = mem.get("results", []) or []
+    max_stored = DEFAULT_CERTAINTY
+    max_epistemic = DEFAULT_CERTAINTY
+    for row in results:
+        max_stored = max(max_stored, float(row.get("stored_certainty", DEFAULT_CERTAINTY)))
+        max_epistemic = max(max_epistemic, float(row.get("epistemic_certainty", DEFAULT_CERTAINTY)))
+
+    state.last_memory = MemoryRetrieveState(
+        query=query,
+        timestamp=utc_now(),
+        exit_code=exit_code,
+        match_count=len(results),
+        max_certainty=max_stored,
+        max_epistemic=max_epistemic,
+    )
+    state.parallel_gate_passed = state.L_n == 1 and bool(query)
+    if state.T_g_bypass_unlocked:
+        state.parallel_gate_passed = True
+    return state
+
+
+def apply_parallel_from_envelope(state: GateState, prompt: str, envelope: dict[str, Any]) -> GateState:
+    query = extract_query(prompt)
+    state.last_prompt = prompt
+    state.T_g_bypass_unlocked = prompt_requests_bypass(prompt)
+
+    if not query:
+        state.parallel_gate_passed = False
+        state.last_memory = MemoryRetrieveState(
+            query="",
+            timestamp=utc_now(),
+            exit_code=3,
+            match_count=0,
+            max_certainty=DEFAULT_CERTAINTY,
+            max_epistemic=DEFAULT_CERTAINTY,
+        )
+        return state
+
+    exit_code, mem = parse_memory_from_envelope(envelope)
+    return apply_memory_to_state(state, query, exit_code, mem)
+
+
 def apply_parallel_eval(state: GateState, prompt: str) -> GateState:
     query = extract_query(prompt)
     state.last_prompt = prompt
@@ -359,30 +421,8 @@ def apply_parallel_eval(state: GateState, prompt: str) -> GateState:
 
     parallel = run_parallel_gate(query)
     mem = parallel.get("memory", {})
-    results = mem.get("results", []) or []
     exit_code = int(parallel.get("memory_exit_code", 3))
-
-    max_stored = DEFAULT_CERTAINTY
-    max_epistemic = DEFAULT_CERTAINTY
-    for row in results:
-        max_stored = max(max_stored, float(row.get("stored_certainty", DEFAULT_CERTAINTY)))
-        max_epistemic = max(max_epistemic, float(row.get("epistemic_certainty", DEFAULT_CERTAINTY)))
-
-    state.last_memory = MemoryRetrieveState(
-        query=query,
-        timestamp=utc_now(),
-        exit_code=exit_code,
-        match_count=len(results),
-        max_certainty=max_stored,
-        max_epistemic=max_epistemic,
-    )
-
-  # Parallel gate passes when L_n active and we completed eval (memory is optional)
-    state.parallel_gate_passed = state.L_n == 1 and bool(query)
-    if state.T_g_bypass_unlocked:
-        state.parallel_gate_passed = True
-
-    return state
+    return apply_memory_to_state(state, query, exit_code, mem)
 
 
 def record_shell_command(state: GateState, command: str) -> GateState:
@@ -533,9 +573,9 @@ def build_gate_context(state: GateState) -> str:
     lines.extend(
         [
             "",
-            "Commands:",
-            "- `python3 scripts/gate.py parallel-eval \"<query>\"`",
-            "- `python3 scripts/memory.py retrieve \"<query>\" --json`",
+        "Commands:",
+        "- `python3 engine.py --gate \"<query>\"` (canonical parallel L_2 entry)",
+        "- `python3 scripts/memory.py retrieve \"<query>\" --json`",
             f"- Audited bypass: {BYPASS_TOKEN}",
         ]
     )
