@@ -44,14 +44,14 @@ Markdown alone does not mask logits. This repo ships machinery that binds collap
 1. **Parallel pre-eval** — `python3 scripts/gate.py parallel-eval "<query>"` or `python3 engine.py --gate "<query>"`
 2. **Memory first** — `python3 scripts/memory.py retrieve "<query>" --json` (exit 0 = match, 3 = no match)
 3. **Response verify** — `python3 scripts/gate.py verify` (stdin or `--text-file`)
-4. **Cursor hooks** — auto-run on prompt submit, block Fast explore subagents, verify responses, auto-correct on fail
+4. **Cursor hooks** — parallel-eval on submit; reflect after collapse into `inference_seeds` for the next pass. **No stop/followup loops.**
 
-Hooks require a **trusted workspace** in Cursor. Cloud agents load `.cursor/hooks.json` from the repo.
+Doctrine: **C_i=0.5 is inference workspace** — know you don't know, then infer (L_v). Not abstention. Not stop-and-correct.
 
 Testing checklist:
 - `python3 scripts/test_gate.py`
-- Submit a prompt in Agent mode → check `.cursor/gate-state.json`
-- Ask a factual question without hedging → `afterAgentResponse` should flag; `stop` may auto-followup
+- Submit a prompt → `.cursor/gate-state.json` should include `inference_seeds` after a response
+- `python3 scripts/gate.py reflect "The sky is blue."` → seeds, not FAIL
 
 Audited bypass (sparingly): include `GATE_BYPASS_AUDITED` in prompt when triangulation is impossible.
 

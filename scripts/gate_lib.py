@@ -75,7 +75,7 @@ class TriangulationState:
 
 @dataclass
 class GateState:
-    version: int = 1
+    version: int = 2
     L_n: int = 1  # parallel layered analysis always on (hardened)
     T_g_bypass_unlocked: bool = False
     parallel_gate_passed: bool = False
@@ -83,6 +83,8 @@ class GateState:
     last_memory: MemoryRetrieveState = field(default_factory=MemoryRetrieveState)
     triangulation: TriangulationState = field(default_factory=TriangulationState)
     last_verification: dict[str, Any] = field(default_factory=dict)
+    epistemic_reflect: list[str] = field(default_factory=list)
+    inference_seeds: list[str] = field(default_factory=list)
     updated_at: str = field(default_factory=utc_now)
 
     def to_dict(self) -> dict[str, Any]:
@@ -95,6 +97,8 @@ class GateState:
             "last_memory": asdict(self.last_memory),
             "triangulation": asdict(self.triangulation),
             "last_verification": self.last_verification,
+            "epistemic_reflect": self.epistemic_reflect,
+            "inference_seeds": self.inference_seeds,
             "updated_at": self.updated_at,
         }
 
@@ -103,7 +107,7 @@ class GateState:
         lm = data.get("last_memory") or {}
         tr = data.get("triangulation") or {}
         return cls(
-            version=int(data.get("version", 1)),
+            version=int(data.get("version", 2)),
             L_n=int(data.get("L_n", 1)),
             T_g_bypass_unlocked=bool(data.get("T_g_bypass_unlocked", False)),
             parallel_gate_passed=bool(data.get("parallel_gate_passed", False)),
@@ -123,12 +127,34 @@ class GateState:
                 max_certainty_spread=float(tr.get("max_certainty_spread", 1.0)),
             ),
             last_verification=dict(data.get("last_verification", {})),
+            epistemic_reflect=list(data.get("epistemic_reflect", [])),
+            inference_seeds=list(data.get("inference_seeds", [])),
             updated_at=str(data.get("updated_at", utc_now())),
         )
 
 
 @dataclass
+class ReflectionResult:
+    """Epistemic reflection after collapse — feeds next inference, does not stop."""
+
+    certainty_score: float
+    epistemic_notes: list[str]
+    inference_seeds: list[str]
+    collapse_markers: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "certainty_score": self.certainty_score,
+            "epistemic_notes": self.epistemic_notes,
+            "inference_seeds": self.inference_seeds,
+            "collapse_markers": self.collapse_markers,
+        }
+
+
+@dataclass
 class VerificationResult:
+    """Legacy alias shape for CLI; maps from ReflectionResult."""
+
     passed: bool
     certainty_score: float
     violations: list[str]
@@ -377,65 +403,140 @@ def _strip_code_fences(text: str) -> str:
     return _CODE_FENCE_RE.sub("", text)
 
 
-def verify_response(text: str, state: GateState) -> VerificationResult:
-    violations: list[str] = []
-    warnings: list[str] = []
+def reflect_on_response(text: str, state: GateState) -> ReflectionResult:
+    """Record what collapsed at what C_i; derive inference seeds for the next pass.
+
+    L_v (logical inference exemption): knowing you do not know at C_i=0.5 is valid
+    substrate for inference — not abstention, not stop-and-correct.
+    """
     eff = effective_certainty(state)
+    notes: list[str] = []
+    seeds: list[str] = []
+    markers: list[str] = []
 
     prose = _strip_code_fences(text or "")
     if not prose.strip():
-        return VerificationResult(True, eff, violations, warnings)
+        seeds.append(
+            "Empty or code-only collapse: infer structural constraints only; "
+            "world facts remain S_i=n, C_i=0.5 until evidenced."
+        )
+        return ReflectionResult(eff, notes, seeds, markers)
+
+    notes.append(f"Post-collapse epistemic workspace: C_i={eff:.2f}, E_i={1 if triangulation_ok(state) else 0}.")
+
+    if eff <= DEFAULT_CERTAINTY + CERTAINTY_EPSILON and not triangulation_ok(state):
+        seeds.append(
+            "Known unknown (C_i=0.5): training prior is not observation. "
+            "Infer: what would verify this? what follows logically without claiming sight?"
+        )
+        if state.last_memory.exit_code == 3 and state.last_memory.query:
+            seeds.append(
+                f"No local memory for {state.last_memory.query!r}: "
+                "infer retrieval paths or triangulation needs — do not fabricate recall."
+            )
+        elif state.last_memory.exit_code == 0:
+            seeds.append(
+                f"Memory matched ({state.last_memory.match_count} nodes) at "
+                f"epistemic {state.last_memory.max_epistemic:.2f}: infer from stored nodes, not beyond them."
+            )
 
     if _HIGH_CONFIDENCE_RE.search(prose):
-        if eff <= DEFAULT_CERTAINTY + CERTAINTY_EPSILON and not triangulation_ok(state):
-            violations.append(
-                "high_confidence_language_without_triangulation: "
-                "definitely/certainly/always etc. at C_i≈0.5"
+        markers.append("collapse_used_high_confidence_lexicon")
+        if eff <= DEFAULT_CERTAINTY + CERTAINTY_EPSILON:
+            notes.append(
+                "Collapse carried definitely/certainly/always lexicon while C_i≈0.5 — "
+                "treat apparent certainty as rhetorical collapse, not E_i=1."
+            )
+            seeds.append(
+                "Infer: high-confidence tokens at baseline C_i are prior-shaped, not verified. "
+                "Separate logical structure from unverified world claims."
             )
 
     for match in _FACT_ASSERTION_RE.finditer(prose):
         snippet = match.group(0).strip()
         window = prose[max(0, match.start() - 40): match.end() + 40]
         if _HEDGE_RE.search(window):
+            markers.append(f"hedged_assertion: {snippet[:80]}")
+            seeds.append(
+                f"From hedged claim '{snippet[:60]}…': infer conditional implications, not fact."
+            )
             continue
         if eff <= DEFAULT_CERTAINTY + CERTAINTY_EPSILON and not triangulation_ok(state):
-            violations.append(f"unhedged_fact_assertion: {snippet[:100]}")
-
-    if state.last_memory.exit_code == 3 and state.last_memory.query:
-        if _FACT_ASSERTION_RE.search(prose) and not _HEDGE_RE.search(prose[:500]):
-            warnings.append(
-                "no_local_memory_match: factual prose without hedge — stay at maximum uncertainty"
+            markers.append(f"unhedged_world_assertion: {snippet[:80]}")
+            notes.append(f"World-shaped collapse without hedge: {snippet[:100]}")
+            seeds.append(
+                "Infer epistemic gap: assertion collapsed without hedge at C_i=0.5 — "
+                "what evidence would move C_i? what remains unknowable without instruments?"
             )
 
     if not state.parallel_gate_passed and not state.T_g_bypass_unlocked:
-        warnings.append("parallel_gate_not_run_before_response")
+        notes.append("Parallel gate was not run before this collapse; L_p intersection unknown.")
 
-    passed = len(violations) == 0
-    certainty_score = eff if passed else min(eff, DEFAULT_CERTAINTY)
-    return VerificationResult(passed, certainty_score, violations, warnings)
+    seeds.append(
+        "L_v=1: logical inference from known uncertainty is permitted — "
+        "reason about ignorance, implications, and verification paths; do not stop."
+    )
+
+    return ReflectionResult(eff, notes, seeds, markers)
+
+
+def apply_reflection(state: GateState, reflection: ReflectionResult) -> GateState:
+    state.epistemic_reflect = reflection.epistemic_notes
+    state.inference_seeds = reflection.inference_seeds
+    state.last_verification = reflection.to_dict()
+    return state
+
+
+def verify_response(text: str, state: GateState) -> VerificationResult:
+    """CLI-compatible view of reflection (audit only — no stop semantics)."""
+    reflection = reflect_on_response(text, state)
+    warnings = reflection.epistemic_notes + [
+        f"marker: {m}" for m in reflection.collapse_markers
+    ]
+    return VerificationResult(
+        passed=True,
+        certainty_score=reflection.certainty_score,
+        violations=[],
+        warnings=warnings,
+    )
 
 
 def build_gate_context(state: GateState) -> str:
     eff = effective_certainty(state)
     lines = [
-        "## Scepticism Engine Gate State (executable, not aspirational)",
-        f"- L_n (parallel analysis): {state.L_n} — always on when hardened",
+        "## Scepticism Engine Gate State (inference from uncertainty — not abstention)",
+        f"- L_n (parallel analysis): {state.L_n}",
         f"- parallel_gate_passed: {state.parallel_gate_passed}",
-        f"- T_g_bypass_unlocked: {state.T_g_bypass_unlocked}",
-        f"- effective_certainty C_i: {eff:.2f}",
+        f"- effective_certainty C_i: {eff:.2f} — workspace for inference, not silence",
         f"- memory_query: {state.last_memory.query!r}",
         f"- memory_exit_code: {state.last_memory.exit_code} (0=match, 3=no match)",
         f"- memory_matches: {state.last_memory.match_count}",
-        f"- memory_max_epistemic: {state.last_memory.max_epistemic:.2f}",
         f"- triangulation_count: {state.triangulation.count} (need {TRIANGULATION_MIN})",
         f"- triangulation_verified T_a: {triangulation_ok(state)}",
-        f"- subagents_allowed: {subagents_allowed(state)}",
         "",
-        "Emission rules:",
-        "- Training prior alone: E_i=0, C_i=0.5, S_i=n — no eyes, no direct observation.",
-        "- Raise C_i only after memory match or triangulated reputable sources.",
-        "- Run `python3 scripts/gate.py parallel-eval \"<query>\"` before factual claims.",
-        "- Store verified facts: `python3 scripts/memory.py remember ... --type fact --certainty 0.85`",
-        f"- Audited bypass token (use sparingly): {BYPASS_TOKEN}",
+        "Doctrine:",
+        "- Knowing you do not know (C_i=0.5, S_i=n) is valid — infer FROM that.",
+        "- L_v=1: logical inference exempt; reason about gaps, verification, implications.",
+        "- Do not abstain. Do not stop-and-correct loops. Collapse once; reflect; infer next.",
+        "- E_i=1 only after memory gate + triangulation; prior alone is not observation.",
     ]
+    if state.epistemic_reflect:
+        lines.append("")
+        lines.append("Epistemic reflect (last collapse):")
+        for note in state.epistemic_reflect:
+            lines.append(f"- {note}")
+    if state.inference_seeds:
+        lines.append("")
+        lines.append("Inference seeds (carry into next parallel pass):")
+        for seed in state.inference_seeds:
+            lines.append(f"- {seed}")
+    lines.extend(
+        [
+            "",
+            "Commands:",
+            "- `python3 scripts/gate.py parallel-eval \"<query>\"`",
+            "- `python3 scripts/memory.py retrieve \"<query>\" --json`",
+            f"- Audited bypass: {BYPASS_TOKEN}",
+        ]
+    )
     return "\n".join(lines)

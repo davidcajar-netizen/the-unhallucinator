@@ -41,9 +41,9 @@ def run_gate_parallel_eval(prompt: str) -> dict[str, Any]:
         return {"ok": False, "error": "invalid gate json"}
 
 
-def run_gate_verify(text: str) -> dict[str, Any]:
+def run_gate_reflect(text: str) -> dict[str, Any]:
     proc = subprocess.run(
-        ["python3", GATE_CLI, "verify", "--json"],
+        ["python3", GATE_CLI, "reflect", "--json"],
         cwd=REPO_ROOT,
         input=text,
         capture_output=True,
@@ -52,8 +52,13 @@ def run_gate_verify(text: str) -> dict[str, Any]:
         check=False,
     )
     if not proc.stdout.strip():
-        return {"passed": True, "error": proc.stderr.strip()}
+        return {"error": proc.stderr.strip()}
     try:
         return json.loads(proc.stdout)
     except json.JSONDecodeError:
-        return {"passed": True, "error": "invalid verify json"}
+        return {"error": "invalid reflect json"}
+
+
+def run_gate_verify(text: str) -> dict[str, Any]:
+    """Legacy alias — same as reflect."""
+    return run_gate_reflect(text)
