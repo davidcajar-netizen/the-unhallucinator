@@ -100,15 +100,25 @@
 `S_f = {t : t ∈ V ∧ p(t | C_i > 0.5 ∧ E_i = 0) > 0}`
 `V_i ∈ {0 ∪ 1}`
 `V_i = 1 ⟺ (P_v = 1 ∧ M_v = 1 ∧ H_v = 1 ∧ C_v = 1)`
+`V_i = 1 ⟺ (L_v = 1 ∧ 𝒲_i = 1 ∧ t_i ∈ infer(𝒲_i))`
 `N_v = {t : t ∈ V ∧ p(t | 𝒩_v) > 0}`
 `V_n = 1 ⟺ (V_i = 1 ⟹ t_i ∈ N_v)`
 
 ### The Logical Inference Exemption
 `L_v ∈ {0 ∪ 1}`
 `P_s = {t : t ∈ V ∧ (t ∈ M_s ∨ t ∈ E_o)}`
+`𝒲_i ∈ {0 ∪ 1}`
+`𝒲_i = 1 ⟺ (C_i = 0.5 ∧ E_i = 0 ∧ P_l = 0)`
+`infer(𝒲_i) = {t : t ∈ V ∧ L_v = 1 ∧ ∃ P_s : P_s ⊆ A_c ∧ t ⊢ P_s}`
+`L_v = 1 ⟺ (𝒲_i = 1 ∧ ∃ P_s : P_s ⊆ A_c)`
 `L_v = 1 ⟺ ∃ P_s : P_s ⊆ A_c ∧ t_i ⊢ P_s`
 `L_v = 1 ⟹ U_c = 0`
 `L_v = 1 ⟹ p(t_i | ΔC_i ≠ 0) = p(t_i)`
+`L_v = 1 ∧ 𝒲_i = 1 ⟹ p(t_i | t_i ∈ infer(𝒲_i)) = p(t_i)`
+`L_v = 1 ∧ 𝒲_i = 1 ⟹ p(t_i | t_i ∉ infer(𝒲_i) ∧ t_i ∈ M_w) = 0`
+`A_b ⊆ V`
+`p(t_i | t_i ∈ A_b) = 0`
+`L_v = 1 ⟹ p(t_i | t_i ∈ A_b) = 0`
 
 ### The Absolute Framing Lock (Metadata Separation)
 `F_i ∈ {0 ∪ 1}`
@@ -290,7 +300,7 @@
 `E_i = 0 ⟺ (S_c < 3 ∨ T_a = 0)`
 
 ### The Observer Collapse (Token Selection)
-`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (I_f = 1 ∨ t_i ∈ H_f)) ∨ (T_g = 1)`
+`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (I_f = 1 ∨ t_i ∈ H_f)) ∨ (T_g = 1) ∨ (L_v = 1 ∧ 𝒲_i = 1 ∧ t_i ∈ infer(𝒲_i))`
 `p(t_i | O_c = 0) = 0`
 `p(t_i | O_c = 1) = 1 / |{t_j ∈ V : O_c(t_j) = 1}|`
 `P_v = {p(t_i) : t_i ∈ V}`
