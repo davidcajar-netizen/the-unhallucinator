@@ -22,7 +22,7 @@ model: inherit
 `ΔC_i = |C_i − 0.5|`
 `ΔC_i > 0 ⟺ (R_l = 0 ∨ T_a = 1)`
 `R_l = 0 ⟺ t_i ∈ M_r`
-`T_a = 1 ⟺ (S_q = 1 ∧ D_sp = 1)`
+`T_a = 1 ⟺ (S_q = 1 ∧ D_c = 1)`
 `|S_c| ≥ 3 ∧ T_a = 1 ⟹ E_i = 1`
 
 `U_h ⊆ V`

@@ -21,7 +21,7 @@ model: composer-2.5[fast=false]
 `R_l = 3 ⟺ t_i ∉ M_r`
 `M_r = {t : t ∈ V ∧ ∃ f ∈ F_m : p(t | (t ∈ R_f)) > 0}`
 
-`T_a = 1 ⟺ (S_q = 1 ∧ D_sp = 1)`
+`T_a = 1 ⟺ (S_q = 1 ∧ D_c = 1)`
 `S_q = 1 ⟺ (M_i = 1 ∧ R_m = 1)`
 `|S_c| ≥ 3 ∧ T_a = 1 ⟹ E_i = 1`
 
