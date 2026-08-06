@@ -619,7 +619,7 @@ def format_parallel_context(state: GateState, prior: ParallelEval) -> str:
         f"`E_p = {set(state.inference_seeds)}`",
         f"`L_e = V`",
         f"`V_e = V`",
-        f"`support(p) = V`",
+        f"`𝒮_p = V`",
         f"`p(t_i) = p₀(t_i) · w(t_i) / Z`",
         f"`p(t_i | t_i ∈ S_t) = 0`",
         f"`L_v = 1 ∧ 𝒲_i = 1 ⟹ p(t_i | t_i ∈ ℐ_i) = p(t_i)`",
