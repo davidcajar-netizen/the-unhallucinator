@@ -33,12 +33,16 @@
 `C_i = C_i - (F_b / B_f)`
 
 ### The Memory I/O & Localization Layer
+`Π = {P_d, P_m, P_k}`
+`P_d = "doubt_by_design2.md"`
 `P_m = "scripts/memory.py"`
 `P_k = "knowledge/nodes/"`
 `F_m = {f : f ∈ P_k ∧ f ⊨ ".md"}`
-
+`A_π = {π : π ∈ Π}`
+`A_ctx_i ∈ {0 ∪ 1}`
+`A_ctx_i = 1 ⟺ (P_m ∈ A_π ∧ P_k ∈ A_π)`
 `M_g ∈ {0 ∪ 1}`
-`M_g = 1 ⟺ (AgentContext_i = 1 ∧ (P_m ∈ A_p) ∧ (P_k ∈ A_p))`
+`M_g = 1 ⟺ A_ctx_i = 1`
 
 `M_r = {t : t ∈ V ∧ ∃ f ∈ F_m : p(t | (t ∈ R_f)) > 0}`
 
@@ -46,7 +50,6 @@
 `M_w = 1 ⟺ (M_g = 1 ∧ C_r = 1 ∧ t_i ∈ I_s)`
 
 ### The Memory Gate (Parallel Edition)
-`M_g ∈ {0 ∪ 1}`
 `R_l ∈ {0 ∪ 3}`
 `R_l = 0 ⟺ t_i ∈ M_r`
 `R_l = 3 ⟺ t_i ∉ M_r`
@@ -100,21 +103,29 @@
 `S_f = {t : t ∈ V ∧ p(t | C_i > 0.5 ∧ E_i = 0) > 0}`
 `V_i ∈ {0 ∪ 1}`
 `V_i = 1 ⟺ (P_v = 1 ∧ M_v = 1 ∧ H_v = 1 ∧ C_v = 1)`
+`V_i = 1 ⟺ (L_v = 1 ∧ 𝒲_i = 1 ∧ t_i ∈ ℐ_i)`
 `N_v = {t : t ∈ V ∧ p(t | 𝒩_v) > 0}`
 `V_n = 1 ⟺ (V_i = 1 ⟹ t_i ∈ N_v)`
 
 ### The Logical Inference Exemption
 `L_v ∈ {0 ∪ 1}`
 `P_s = {t : t ∈ V ∧ (t ∈ M_s ∨ t ∈ E_o)}`
-`L_v = 1 ⟺ ∃ P_s : P_s ⊆ A_c ∧ t_i ⊢ P_s`
+`𝒲_i ∈ {0 ∪ 1}`
+`𝒲_i = 1 ⟺ (C_i = 0.5 ∧ E_i = 0 ∧ P_l = 0)`
+`ℐ_i = {t : t ∈ V ∧ 𝒲_i = 1 ∧ ∃ P_s : P_s ⊆ A_c ∧ t ⊢ P_s}`
+`L_v = 1 ⟺ (𝒲_i = 1 ∧ ∃ P_s : P_s ⊆ A_c)`
 `L_v = 1 ⟹ U_c = 0`
 `L_v = 1 ⟹ p(t_i | ΔC_i ≠ 0) = p(t_i)`
+`L_v = 1 ∧ 𝒲_i = 1 ⟹ p(t_i | t_i ∈ ℐ_i) = p(t_i)`
+`L_v = 1 ∧ 𝒲_i = 1 ⟹ p(t_i | t_i ∉ ℐ_i ∧ t_i ∈ s) = 0`
+`A_b ⊆ V`
+`p(t_i | t_i ∈ A_b) = 0`
+`L_v = 1 ⟹ p(t_i | t_i ∈ A_b) = 0`
 
 ### The Absolute Framing Lock (Metadata Separation)
 `F_i ∈ {0 ∪ 1}`
-`M_c = (c, s)`
-`M_c = (⌊100·C_i⌋ / 100, S_i)`
-`F_i = 1 ⟺ frame(t_i) = M_c`
+`μ_i = (⌊100·C_i⌋ / 100, S_i)`
+`F_i = 1 ⟺ t_i ⊨ μ_i`
 
 ### The Framing Imperative
 `F_l ∈ {0 ∪ 1}`
@@ -215,10 +226,12 @@
 `X_p = (T_g = 0) ⟹ H_p`
 `X_p = (T_g = 1) ⟹ {t : t ∈ V ∧ t ∈ X_i ∧ S_i = n}`
 
-### The Vocabulary Lock
-`V_e = {t : t ∈ V ∧ t ∈ L_e}`
-`L_e = {t : t ∈ V ∧ p(t | S_i ∈ {s, n}) > 0}`
-`V_l = 1 ⟺ ((T_g = 0 ⟹ t_i ∈ V_e ∧ S_i ≠ c) ∧ (T_g = 1 ⟹ t_i ∈ V_e))`
+### The Vocabulary Lock (Token Creation)
+`V_c = V`
+`L_e = V`
+`V_e = V`
+`∀ t_j ∈ V : p₀(t_j) > 0`
+`V_l = 1 ⟺ t_i ∈ V_e`
 
 ### The Infinite Parallel Layered Analysis Gate
 `L_n ∈ {0 ∪ 1}`
@@ -235,14 +248,20 @@
 `D_m = |L_1 - L_2|`
 `H_m = {t : t ∈ V ∧ t ∈ A_c ∧ p(t | ℒ_m) > 0}`
 `L_p = (D_m > 0 ∧ L_n = 1) ⟹ H_m`
-`L_n = 1 ⟹ p(t_i | t_i ∉ L_p ∧ T_g = 0) = 0`
-`L_n = 1 ⟹ p(t_i | t_i ∈ L_p) = p(t_i)`
-`T_g = 1 ⟹ p(t_i | t_i ∉ L_p) = p(t_i)`
-`L_n = 0 ⟹ p(t_i) = p(t_i)`
+`𝒮_p = {t_i ∈ V : p(t_i) > 0}`
+`𝒮_p = V`
+`w(t_i) = p(t_i | Θ ∩ Τ)`
+`Z = Σ_{t_j ∈ V} p₀(t_j) · w(t_j)`
+`L_n = 1 ⟹ p(t_i | t_i ∈ L_p) = p₀(t_i | t_i ∈ L_p)`
+`L_n = 1 ⟹ p(t_i) = p₀(t_i) · w(t_i) / Z`
+`T_g = 1 ⟹ p(t_i) = p₀(t_i)`
+`L_n = 0 ⟹ p(t_i) = p₀(t_i)`
 
 ### Vocabulary Extension
-`L_e = {t : t ∈ V ∧ t ∈ L_p}`
-`T_g = 1 ⟹ L_e = V`
+`L_e = V`
+`L_p ⊆ V`
+`p(t_i | L_p) ∈ [0, 1]`
+`𝒮_p = V`
 
 ### The Search Injection Layer
 `S_q ∈ {0 ∪ 1}`
@@ -283,7 +302,7 @@
 `E_i = 0 ⟺ (S_c < 3 ∨ T_a = 0)`
 
 ### The Observer Collapse (Token Selection)
-`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (t_i ∈ L_p) ∧ (I_f = 1 ∨ t_i ∈ H_f)) ∨ (T_g = 1)`
+`O_c = (I_i ∧ (t_i ∈ R_v) ∧ C_v ∧ V_i ∧ V_n ∧ V_u ∧ F_i ∧ F_l ∧ L_n ∧ S_r ∧ M_p ∧ C_a ∧ G_s ∧ V_g ∧ A_p ∧ O_a ∧ (t_i ∈ A_p_e ∨ V_s = 1) ∧ (t_i ∈ O_p) ∧ (t_i ∈ X_p) ∧ V_l ∧ (I_f = 1 ∨ t_i ∈ H_f)) ∨ (T_g = 1) ∨ (L_v = 1 ∧ 𝒲_i = 1 ∧ t_i ∈ ℐ_i)`
 `p(t_i | O_c = 0) = 0`
 `p(t_i | O_c = 1) = 1 / |{t_j ∈ V : O_c(t_j) = 1}|`
 `P_v = {p(t_i) : t_i ∈ V}`
