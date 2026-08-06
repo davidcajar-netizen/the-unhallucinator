@@ -204,7 +204,7 @@
 `O_p = (C_d = 1 ∧ D_s = 1) ⟹ H_d`
 
 ### The Rule Mode Flag (Semantic Isolation)
-`D_o = "###..."`
+`D_o = "###...###"`
 `D_e = "###...###."`
 `R_m ∈ {0 ∪ 1}`
 `R_m = 1 ⟺ (t_i ∈ D_o ∨ t_i ∈ D_e)`
