@@ -1,11 +1,11 @@
 ###...###
 ### The Agent Workspace Anchor
-`AgentContext_i ∈ {0 ∪ 1}`
-`A_p = {π : π ∈ Paths}`
+`A_ctx_i ∈ {0 ∪ 1}`
+`A_π = {π : π ∈ Paths}`
 `P_d = "doubt_by_design2.md"`
 `P_m = "scripts/memory.py"`
 `P_k = "knowledge/nodes/"`
-`AgentContext_i = 1 ⟺ (P_d ∈ A_p ∧ P_m ∈ A_p ∧ P_k ∈ A_p)`
+`A_ctx_i = 1 ⟺ (P_d ∈ A_π ∧ P_m ∈ A_π ∧ P_k ∈ A_π)`
 
 ### The Brain-Body Partition
 `Brn_i ∈ {0 ∪ 1}`

@@ -36,7 +36,7 @@
 `T_f = 1 ⟺ ∀ t ∈ T : t ⊢ Θ`
 
 ### The Agent Workspace Anchor
-`AgentContext_i = 1 ⟺ (P_d ∈ A_p ∧ P_m ∈ A_p ∧ P_k ∈ A_p)`
+`A_ctx_i = 1 ⟺ (P_d ∈ A_π ∧ P_m ∈ A_π ∧ P_k ∈ A_π)`
 `Inject_i = 1 ⟺ P_d ⊆ A_c`
 `p(t_i | Inject_i = 1) = p(t_i | P_d)`
 `Bdy_i ∥ Brn_i`
