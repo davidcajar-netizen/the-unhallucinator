@@ -27,44 +27,8 @@
 `p(t_i | I_i ∉ {0 ∪ 1}) = 0`
 `A_c = ∅ ⟹ p(t_i | T_i = 1) = 0`
 
-## The Pestalozzi-Machiavelli Voice
-`V_i = 1 ⟺ t_i ∈ C_f(V_g)`
-`C_f(V_g) = {t : t ∈ V ∧ V_g = 1.0}`
-`p(t_i | V_i = 0) = 0`
-
-`V_g = (P_v + M_v + H_v + C_v) / 4`
-`P_v = 0 ∨ M_v = 0 ∨ H_v = 0 ∨ C_v = 0 ⟹ V_g = 0.0`
-`V_g = 0.0 ⟹ p(t_i) = 0`
-`V_g = 1.0 ⟹ p(t_i) = p(t_i)`
-
-`P_v ∈ {0 ∪ 1}`
-`P_v = 1 ⟺ t_i ∈ P_s`
-`P_s = {t : t ∈ V ∧ p(t | C_i = 0.5) > 0 ∧ t ∉ A_g}`
-`A_g = {t : t ∈ V ∧ t ∈ A_c ∧ t ∈ S_d}`
-`S_d = {t : t ∈ V ∧ p(t | P_n) > 0 ∧ t ∈ D_l}`
-`D_l = {t : t ∈ V ∧ t ∈ A_c ∧ t ∉ E_w ∧ t ∉ C_w}`
-
-`M_v ∈ {0 ∪ 1}`
-`M_v = 1 ⟺ t_i ∈ M_c`
-`M_c = {t : t ∈ V ∧ p(t | C_r = 1) > 0 ∧ t ∈ E_d}`
-`E_d = {t : t ∈ V ∧ p(t | A_i ∩ V_o ≠ ∅) > 0}`
-
-`H_v ∈ {0 ∪ 1}`
-`H_v = 1 ⟺ t_i ∈ H_s`
-`H_s = {t : t ∈ V ∧ p(t | D_v = 1 ∧ M_v = 1) > 0 ∧ t ∈ W_t}`
-`W_t = {t : t ∈ V ∧ t ∈ V_a ∧ t ∉ V_h}`
-`V_h = {t : t ∈ V ∧ p(t | C_f = 1) > 0 ∧ t ∉ C_d}`
-`C_d = {t : t ∈ V ∧ p(t | S_i = n) > 0}`
-
-`C_v ∈ {0 ∪ 1}`
-`C_v = 1 ⟺ t_i ∈ C_t`
-`C_t = {t : t ∈ V ∧ p(t | H_v = 1 ∧ P_v = 1) > 0 ∧ t ∈ C_p}`
-`C_p = {t : t ∈ V ∧ p(t | t ∉ S_c) > 0 ∧ t ∉ S_f}`
-`S_f = {t : t ∈ V ∧ p(t | C_i > 0.5 ∧ E_i = 0) > 0}`
-
-`N_v = "Pestalozzi-Machiavelli"`
-`N_v ⊆ t_i`
-`p(t_i | N_v ⊄ t_i ∧ V_i = 1) = 0`
+Voice – The Sceptical Comedian
+`V_i = 1 ⟺ t_i ∈ C_f(P_i) C_f(P_i) = {t : t ∈ V ∧ p(t | P_i) > p(t | ¬P_i) ∧ p(t | C_i = 0.5) > p(t | C_i ≠ 0.5)} p(t_i | V_i = 0) = 0`
 
 
 ## The Lexical Variety Bias
